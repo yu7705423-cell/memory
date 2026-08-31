@@ -1,0 +1,1954 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Archive · JSON 聊天记录浏览器</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-2: #fafafa;
+    --bg-3: #f1f1f1;
+    --bg-hover: #f6f6f6;
+    --fg: #0d0d0d;
+    --fg-2: #6e6e6e;
+    --fg-3: #a8a8a8;
+    --line: #e6e6e6;
+    --line-2: #d4d4d4;
+    --mark-bg: #1a1a1a;
+    --mark-fg: #ffffff;
+    --shadow: 0 8px 32px rgba(0,0,0,.10);
+    --radius: 10px;
+    --radius-sm: 7px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0b0b;
+    --bg-2: #131313;
+    --bg-3: #1c1c1c;
+    --bg-hover: #171717;
+    --fg: #f2f2f2;
+    --fg-2: #9a9a9a;
+    --fg-3: #6a6a6a;
+    --line: #242424;
+    --line-2: #333333;
+    --mark-bg: #f2f2f2;
+    --mark-fg: #0b0b0b;
+    --shadow: 0 8px 32px rgba(0,0,0,.55);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  ::selection { background: var(--mark-bg); color: var(--mark-fg); }
+
+  .i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
+       stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  .i-lg { width: 20px; height: 20px; }
+  .i-xl { width: 32px; height: 32px; stroke-width: 1.2; }
+
+  /* ---------- shell ---------- */
+  .app { display: grid; grid-template-rows: 54px 1fr; height: 100vh; height: 100dvh; }
+  .topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 16px; border-bottom: 1px solid var(--line);
+    background: var(--bg); z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; letter-spacing: -.01em; user-select: none; }
+  .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fg); flex: none; }
+  .flex-1 { flex: 1; min-width: 0; }
+
+  .searchbox {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-3); border: 1px solid transparent;
+    border-radius: var(--radius); padding: 0 10px; height: 34px;
+    width: min(460px, 42vw); transition: border-color .15s, background .15s;
+  }
+  .searchbox:focus-within { background: var(--bg); border-color: var(--line-2); }
+  .searchbox svg { color: var(--fg-3); }
+  .searchbox input {
+    flex: 1; min-width: 0; border: 0; background: transparent; outline: 0;
+    font-family: var(--font); font-size: 13.5px; color: var(--fg);
+  }
+  .searchbox input::placeholder { color: var(--fg-3); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 34px; padding: 0 14px; border-radius: var(--radius-sm);
+    border: 1px solid var(--fg); background: var(--fg); color: var(--bg);
+    font-family: var(--font); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: opacity .15s, background .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .btn:hover { opacity: .82; }
+  .btn:active { opacity: .7; }
+  .btn.ghost { background: transparent; color: var(--fg); border-color: var(--line-2); }
+  .btn.ghost:hover { background: var(--bg-hover); opacity: 1; }
+  .btn.quiet { background: transparent; color: var(--fg-2); border-color: transparent; }
+  .btn.quiet:hover { background: var(--bg-hover); color: var(--fg); opacity: 1; }
+  .btn:disabled { opacity: .35; cursor: not-allowed; }
+  .btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; }
+  .btn.block { width: 100%; }
+
+  .iconbtn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: var(--radius-sm);
+    border: 0; background: transparent; color: var(--fg-2); cursor: pointer;
+    transition: background .15s, color .15s; flex: none;
+  }
+  .iconbtn:hover { background: var(--bg-hover); color: var(--fg); }
+  .iconbtn:disabled { opacity: .3; cursor: not-allowed; }
+  .iconbtn:disabled:hover { background: transparent; color: var(--fg-2); }
+
+  .body { display: grid; grid-template-columns: 268px 1fr; min-height: 0; }
+
+  /* ---------- sidebar ---------- */
+  .sidebar { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--bg-2); }
+  .side-head { padding: 14px 16px 10px; display: flex; align-items: center; gap: 8px; }
+  .side-title { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); }
+  .side-filter { padding: 0 12px 10px; }
+  .side-filter .searchbox { width: 100%; height: 30px; }
+  .side-list { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
+
+  .role {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 8px 8px; border-radius: var(--radius-sm); border: 0;
+    background: transparent; cursor: pointer; text-align: left;
+    font-family: var(--font); color: var(--fg); transition: background .12s;
+  }
+  .role:hover { background: var(--bg-hover); }
+  .role.active { background: var(--bg-3); }
+  .role.active .role-name { font-weight: 600; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--line-2); color: var(--fg); background: var(--bg);
+    overflow: hidden;
+  }
+  .avatar.sq { border-radius: 8px; }
+  .role-meta { min-width: 0; flex: 1; }
+  .role-name { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .role-sub { font-size: 11.5px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+  .role-count { font-size: 11.5px; color: var(--fg-3); font-variant-numeric: tabular-nums; flex: none; }
+
+  /* ---------- main ---------- */
+  .main { display: flex; flex-direction: column; min-height: 0; position: relative; background: var(--bg); }
+  .mainbar {
+    display: flex; align-items: center; gap: 12px; padding: 10px 20px;
+    border-bottom: 1px solid var(--line); min-height: 52px; background: var(--bg); z-index: 5;
+  }
+  .mainbar-title { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+  .mainbar-sub { font-size: 12px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px 0 10px;
+    border: 1px solid var(--line-2); border-radius: 999px; font-size: 12px; color: var(--fg-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .chip .iconbtn { width: 20px; height: 20px; }
+  .chip .i { width: 13px; height: 13px; }
+  .seg { display: flex; align-items: center; gap: 2px; background: var(--bg-3); border-radius: var(--radius-sm); padding: 2px; }
+  .seg button {
+    border: 0; background: transparent; color: var(--fg-2); font-family: var(--font);
+    font-size: 12px; padding: 4px 9px; border-radius: 5px; cursor: pointer; white-space: nowrap;
+  }
+  .seg button.on { background: var(--bg); color: var(--fg); font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
+  .viewport { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; contain: strict; }
+  .spacer { position: relative; width: 100%; }
+  .row { position: absolute; top: 0; left: 0; right: 0; will-change: transform; }
+
+  .msg { display: flex; gap: 11px; padding: 9px 24px; align-items: flex-start; }
+  .msg:hover { background: var(--bg-2); }
+  .msg-body { min-width: 0; flex: 1; }
+  .msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+  .msg-name { font-size: 13px; font-weight: 600; letter-spacing: -.005em; }
+  .msg-time { font-size: 11.5px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+  .msg-idx { font-size: 11px; color: var(--fg-3); font-family: var(--mono); margin-left: auto; opacity: 0; }
+  .msg:hover .msg-idx { opacity: 1; }
+  .msg-text { font-size: 14px; line-height: 1.62; color: var(--fg); white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+  .msg-text.clamped { max-height: 8.1em; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 68%, transparent); mask-image: linear-gradient(180deg, #000 68%, transparent); }
+  .msg-more { margin-top: 4px; font-size: 12px; color: var(--fg-2); background: none; border: 0; padding: 0; cursor: pointer; font-family: var(--font); text-decoration: underline; text-underline-offset: 3px; }
+  .msg-more:hover { color: var(--fg); }
+  .msg.hit { background: var(--bg-2); box-shadow: inset 2px 0 0 var(--fg); }
+  mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 2px; padding: 0 1px; }
+
+  .datechip {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    background: var(--bg); border: 1px solid var(--line); color: var(--fg-2);
+    font-size: 11.5px; padding: 3px 11px; border-radius: 999px; pointer-events: none;
+    z-index: 4; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,.05);
+  }
+  .datechip.show { opacity: 1; }
+
+  /* ---------- empty / dropzone ---------- */
+  .empty {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; text-align: center;
+    padding: 40px; color: var(--fg-3); background: var(--bg); z-index: 8;
+  }
+  .empty h2 { font-size: 17px; font-weight: 600; color: var(--fg); letter-spacing: -.01em; }
+  .empty p { font-size: 13px; max-width: 400px; line-height: 1.7; }
+  .dropzone {
+    border: 1px dashed var(--line-2); border-radius: 14px; padding: 34px 44px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    transition: border-color .15s, background .15s; cursor: pointer; background: var(--bg-2);
+  }
+  .dropzone:hover, .dropzone.over { border-color: var(--fg); background: var(--bg-3); }
+  .dropzone svg { color: var(--fg-2); }
+
+  /* ---------- overlay / modal ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.34);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    z-index: 60; opacity: 0; pointer-events: none; transition: opacity .16s;
+  }
+  :root[data-theme="dark"] .overlay { background: rgba(0,0,0,.6); }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .modal {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow); width: min(620px, 100%); max-height: min(86vh, 760px);
+    display: flex; flex-direction: column; transform: translateY(6px); transition: transform .16s;
+  }
+  .overlay.open .modal { transform: none; }
+  .modal.wide { width: min(760px, 100%); }
+  .modal-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+  .modal-title { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  .modal-body { padding: 18px; overflow-y: auto; }
+  .modal-foot { padding: 14px 18px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  .label { display: block; font-size: 12px; font-weight: 500; color: var(--fg-2); margin-bottom: 6px; }
+  .help { font-size: 12px; color: var(--fg-3); line-height: 1.6; margin-top: 6px; }
+  select, textarea, input[type="text"] {
+    width: 100%; border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+    background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 13px;
+    padding: 8px 10px; outline: 0; transition: border-color .15s;
+  }
+  select:focus, textarea:focus, input[type="text"]:focus { border-color: var(--fg); }
+  textarea { min-height: 130px; font-family: var(--mono); font-size: 12px; resize: vertical; line-height: 1.5; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .check { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; padding: 7px 0; font-size: 13px; }
+  .check input { margin-top: 2px; accent-color: var(--fg); width: 14px; height: 14px; flex: none; }
+  .check-sub { font-size: 11.5px; color: var(--fg-3); }
+
+  .maprow { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .maprow:last-child { border-bottom: 0; }
+  .maprow .label { margin: 0; color: var(--fg); font-weight: 500; }
+  .samplebox {
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-sm);
+    padding: 10px 12px; font-family: var(--mono); font-size: 11.5px; color: var(--fg-2);
+    max-height: 150px; overflow: auto; white-space: pre; line-height: 1.6;
+  }
+  .note {
+    display: flex; gap: 9px; align-items: flex-start; background: var(--bg-2);
+    border: 1px solid var(--line); border-left: 2px solid var(--fg-3);
+    border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12.5px; color: var(--fg-2); line-height: 1.6;
+  }
+  .note svg { color: var(--fg-2); margin-top: 2px; }
+
+  .progress { height: 2px; background: var(--bg-3); border-radius: 2px; overflow: hidden; margin-top: 12px; }
+  .progress > div { height: 100%; background: var(--fg); width: 0; transition: width .2s; }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 14px);
+    background: var(--fg); color: var(--bg); font-size: 13px; padding: 9px 16px;
+    border-radius: 999px; z-index: 90; opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s; display: flex; align-items: center; gap: 8px; max-width: 80vw;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line-2); border-bottom-width: 2px;
+         border-radius: 4px; padding: 1px 5px; color: var(--fg-2); }
+
+  .scrollthin::-webkit-scrollbar, .viewport::-webkit-scrollbar, .side-list::-webkit-scrollbar, .modal-body::-webkit-scrollbar { width: 10px; height: 10px; }
+  .scrollthin::-webkit-scrollbar-thumb, .viewport::-webkit-scrollbar-thumb, .side-list::-webkit-scrollbar-thumb, .modal-body::-webkit-scrollbar-thumb {
+    background: var(--line-2); border-radius: 99px; border: 3px solid var(--bg);
+  }
+  .viewport::-webkit-scrollbar-thumb:hover { background: var(--fg-3); }
+  .scrollthin::-webkit-scrollbar-track, .viewport::-webkit-scrollbar-track { background: transparent; }
+
+  @media (max-width: 860px) {
+    .body { grid-template-columns: 1fr; }
+    .sidebar { position: absolute; inset: 54px auto 0 0; width: 268px; z-index: 30; transform: translateX(-100%); transition: transform .2s; box-shadow: var(--shadow); }
+    .sidebar.open { transform: none; }
+    .searchbox { width: auto; flex: 1; }
+    .brand span { display: none; }
+    .hide-sm { display: none !important; }
+  }
+  @media (min-width: 861px) { .only-sm { display: none !important; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12m0 0 5-5m-5 5-5-5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="8" r="3.2"/><path d="M22 20v-1a4 4 0 0 0-3-3.87"/><path d="M16 4.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 10 6 6 6-6"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 7V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/><path d="M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"/><path d="M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4M12 17h.01"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></symbol>
+    <symbol id="i-theme" viewBox="0 0 24 24"><path d="M20 13.5A8 8 0 0 1 10.5 4a8.5 8.5 0 1 0 9.5 9.5Z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-sort" viewBox="0 0 24 24"><path d="M4 7h16M7 12h10M10 17h4"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4.5 4.5L19 7"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10Z"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <button class="iconbtn only-sm" id="btnSide" title="角色列表"><svg class="i i-lg"><use href="#i-menu"/></svg></button>
+    <div class="brand"><span class="dot"></span><span>Chat Archive</span></div>
+
+    <div class="searchbox">
+      <svg class="i"><use href="#i-search"/></svg>
+      <input id="q" type="text" placeholder="搜索对话关键词…" autocomplete="off" spellcheck="false">
+      <button class="iconbtn" id="qClear" hidden style="width:22px;height:22px"><svg class="i"><use href="#i-close"/></svg></button>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <button class="btn ghost hide-sm" id="btnImport"><svg class="i"><use href="#i-upload"/></svg>导入</button>
+    <button class="btn ghost hide-sm" id="btnExport"><svg class="i"><use href="#i-download"/></svg>导出</button>
+    <button class="iconbtn only-sm" id="btnImportSm"><svg class="i i-lg"><use href="#i-upload"/></svg></button>
+    <button class="iconbtn" id="btnTheme" title="切换主题"><svg class="i i-lg"><use href="#i-theme"/></svg></button>
+  </header>
+
+  <div class="body">
+    <aside class="sidebar" id="sidebar">
+      <div class="side-head">
+        <svg class="i" style="color:var(--fg-3)"><use href="#i-users"/></svg>
+        <span class="side-title">角色</span>
+        <span class="flex-1"></span>
+        <span class="role-count" id="roleTotal"></span>
+      </div>
+      <div class="side-filter">
+        <div class="searchbox">
+          <svg class="i"><use href="#i-search"/></svg>
+          <input id="roleFilter" type="text" placeholder="筛选角色" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+      <div class="side-list" id="roleList"></div>
+      <div style="padding:10px 12px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center">
+        <svg class="i" style="color:var(--fg-3)"><use href="#i-db"/></svg>
+        <span class="role-sub flex-1" id="cacheInfo">未缓存</span>
+        <button class="iconbtn" id="btnClearCache" title="清除本地缓存"><svg class="i"><use href="#i-trash"/></svg></button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="mainbar">
+        <div style="min-width:0">
+          <div class="mainbar-title" id="viewTitle">全部消息</div>
+          <div class="mainbar-sub" id="viewSub">尚未导入数据</div>
+        </div>
+        <div class="flex-1"></div>
+        <div class="chip" id="hitChip" hidden>
+          <span id="hitLabel">0 / 0</span>
+          <button class="iconbtn" id="hitPrev" title="上一条匹配 (Shift+Enter)"><svg class="i"><use href="#i-up"/></svg></button>
+          <button class="iconbtn" id="hitNext" title="下一条匹配 (Enter)"><svg class="i"><use href="#i-down"/></svg></button>
+        </div>
+        <div class="seg hide-sm" id="modeSeg" hidden>
+          <button data-mode="filter" class="on">仅匹配</button>
+          <button data-mode="locate">全部+定位</button>
+        </div>
+      </div>
+
+      <div class="viewport" id="viewport">
+        <div class="spacer" id="spacer"></div>
+        <div class="empty" id="noHit" style="display:none;background:transparent">
+          <svg class="i i-xl"><use href="#i-search"/></svg>
+          <h2>没有匹配的消息</h2>
+          <p id="noHitSub"></p>
+        </div>
+      </div>
+      <div class="datechip" id="dateChip"></div>
+
+      <div class="empty" id="empty">
+        <div class="dropzone" id="dropzone">
+          <svg class="i i-xl"><use href="#i-upload"/></svg>
+          <h2>导入聊天记录</h2>
+          <p>拖入 <code>.json</code> / <code>.jsonl</code> / <code>.ndjson</code> 文件，或点击选择。<br>解析在后台线程完成，几十万条消息也不会卡住页面。</p>
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <button class="btn" id="btnPick"><svg class="i"><use href="#i-file"/></svg>选择文件</button>
+            <button class="btn ghost" id="btnPaste">粘贴 JSON</button>
+          </div>
+        </div>
+        <p style="font-size:12px">也可以直接把文件拖到窗口任意位置</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".json,.jsonl,.ndjson,.txt,application/json" hidden>
+
+<!-- 粘贴导入 -->
+<div class="overlay" id="pasteModal">
+  <div class="modal">
+    <div class="modal-head">
+      <svg class="i i-lg"><use href="#i-file"/></svg>
+      <span class="modal-title">粘贴 JSON</span>
+      <span class="flex-1"></span>
+      <button class="iconbtn" data-close><svg class="i"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label class="label">支持数组 <code>[{…}]</code>、对象包数组 <code>{data:[{…}]}</code>、或每行一条的 NDJSON</label>
+        <textarea id="pasteInput" spellcheck="false" placeholder='[
+  {"message": "你好", "sender": "Alice", "timestamp": 1693478400},
+  {"message": "hi", "sender": "Bob", "timestamp": 1693478410}
+]'></textarea>
+      </div>
+      <div class="note">
+        <svg class="i"><use href="#i-info"/></svg>
+        <span>数据量超过几万条时建议改用文件导入 —— 浏览器文本框在超长文本下本身就会卡。</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn quiet" id="btnSample">填充示例</button>
+      <span class="flex-1"></span>
+      <button class="btn ghost" data-close>取消</button>
+      <button class="btn" id="btnPasteGo">解析</button>
+    </div>
+  </div>
+</div>
+
+<!-- 字段映射 -->
+<div class="overlay" id="mapModal">
+  <div class="modal wide">
+    <div class="modal-head">
+      <svg class="i i-lg"><use href="#i-sort"/></svg>
+      <span class="modal-title">字段映射</span>
+      <span class="flex-1"></span>
+      <button class="iconbtn" data-close><svg class="i"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="mainbar-sub" id="mapStat" style="margin-bottom:14px"></div>
+      <div id="mapRows"></div>
+      <div class="field" style="margin-top:16px">
+        <label class="check"><input type="checkbox" id="optSort">
+          <span>按时间升序排序<span class="check-sub" style="display:block">原始顺序未必是时间顺序时勾选</span></span>
+        </label>
+        <label class="check"><input type="checkbox" id="optCache" checked>
+          <span>缓存到本地 IndexedDB<span class="check-sub" style="display:block">下次打开直接恢复，无需重新导入</span></span>
+        </label>
+      </div>
+      <div class="field">
+        <label class="label">数据样本</label>
+        <div class="samplebox" id="mapSample"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="mainbar-sub flex-1" id="mapMsg"></span>
+      <button class="btn ghost" data-close>取消</button>
+      <button class="btn" id="btnMapGo">载入</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导出 -->
+<div class="overlay" id="exportModal">
+  <div class="modal">
+    <div class="modal-head">
+      <svg class="i i-lg"><use href="#i-download"/></svg>
+      <span class="modal-title">导出</span>
+      <span class="flex-1"></span>
+      <button class="iconbtn" data-close><svg class="i"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label class="label">导出范围</label>
+        <div class="seg" id="scopeSeg" style="display:inline-flex">
+          <button data-scope="view" class="on">当前视图</button>
+          <button data-scope="all">全部消息</button>
+        </div>
+        <div class="help" id="scopeHint"></div>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" id="expTime" checked><span>包含时间戳</span></label>
+        <label class="check"><input type="checkbox" id="expIndex"><span>包含原始序号</span></label>
+      </div>
+      <div class="field">
+        <label class="label">格式</label>
+        <div class="grid-2">
+          <button class="btn ghost block" id="expHTML"><svg class="i"><use href="#i-file"/></svg>HTML 页面</button>
+          <button class="btn ghost block" id="expMD"><svg class="i"><use href="#i-file"/></svg>Markdown</button>
+          <button class="btn ghost block" id="expJSON"><svg class="i"><use href="#i-file"/></svg>JSON</button>
+          <button class="btn ghost block" id="expTXT"><svg class="i"><use href="#i-file"/></svg>纯文本</button>
+        </div>
+      </div>
+      <div class="note">
+        <svg class="i"><use href="#i-info"/></svg>
+        <span>导出的 HTML 自带分块懒加载，几十万条也能直接用浏览器打开；单文件体积约等于原始文本大小。</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ===================== Web Worker: 解析 / 归一化 / 搜索 ===================== -->
+<script type="text/js-worker" id="workerSrc">
+'use strict';
+
+var RAW = null;            // 解析后的原始对象数组（映射确认后即释放）
+var CH = [];               // 搜索用的分块大字符串 [{text, off, base, n}]
+var MSG_CHUNK = 20000;     // 每块消息数上限
+var CHAR_CHUNK = 8e6;      // 每块字符数上限
+var SEP = String.fromCharCode(1);   // 消息分隔符：关键词不可能包含，避免跨条误匹配
+
+function post(m, t) { self.postMessage(m, t || []); }
+function progress(stage, pct, note) { post({ type: 'progress', stage: stage, pct: pct, note: note || '' }); }
+
+/* ---------- 路径工具：支持 a.b.c 形式的嵌套字段 ---------- */
+function collectPaths(obj, prefix, out, depth) {
+  if (!obj || typeof obj !== 'object' || depth > 3) return;
+  var keys = Object.keys(obj);
+  for (var i = 0; i < keys.length && out.length < 200; i++) {
+    var k = keys[i], v = obj[k];
+    var p = prefix ? prefix + '.' + k : k;
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      collectPaths(v, p, out, depth + 1);
+    } else if (out.indexOf(p) === -1) {
+      out.push(p);
+    }
+  }
+}
+
+function getPath(obj, path) {
+  if (!path) return undefined;
+  if (path.indexOf('.') === -1) return obj ? obj[path] : undefined;
+  var parts = path.split('.'), cur = obj;
+  for (var i = 0; i < parts.length; i++) {
+    if (cur == null || typeof cur !== 'object') return undefined;
+    cur = cur[parts[i]];
+  }
+  return cur;
+}
+
+/* ---------- 值 -> 文本：兼容分段内容数组 ---------- */
+function toText(v) {
+  if (v == null) return '';
+  var t = typeof v;
+  if (t === 'string') return v;
+  if (t === 'number' || t === 'boolean') return String(v);
+  if (Array.isArray(v)) {
+    var buf = [];
+    for (var i = 0; i < v.length; i++) {
+      var p = v[i];
+      if (p == null) continue;
+      if (typeof p === 'string') buf.push(p);
+      else if (typeof p === 'object') buf.push(p.text || p.content || p.value || p.caption || '');
+      else buf.push(String(p));
+    }
+    return buf.join('');
+  }
+  if (v.text != null) return toText(v.text);
+  if (v.content != null) return toText(v.content);
+  if (v.value != null) return toText(v.value);
+  try { return JSON.stringify(v); } catch (e) { return String(v); }
+}
+
+function parseTime(v) {
+  if (v == null || v === '') return NaN;
+  var n;
+  if (typeof v === 'number') n = v;
+  else {
+    var s = String(v).trim();
+    if (/^\d+(\.\d+)?$/.test(s)) n = parseFloat(s);
+    else {
+      var t = Date.parse(s);
+      if (isNaN(t)) t = Date.parse(s.replace(/-/g, '/'));
+      return isNaN(t) ? NaN : t;
+    }
+  }
+  if (!isFinite(n) || n <= 0) return NaN;
+  if (n > 1e14) return n / 1000;   // 微秒
+  if (n > 1e11) return n;          // 毫秒
+  return n * 1000;                 // 秒
+}
+
+/* ---------- 自动识别字段 ---------- */
+var PATTERNS = {
+  message: ['message', 'content', 'text', 'body', 'msg', 'value', 'say', 'speech', 'data'],
+  sender: ['sender', 'speaker', 'role', 'author', 'user', 'name', 'from', 'nick', 'who', 'character'],
+  timestamp: ['timestamp', 'time', 'date', 'created', 'sent', 'ctime', 'ts', 'at']
+};
+
+function detect(paths, rows) {
+  var res = {};
+  for (var field in PATTERNS) {
+    var kws = PATTERNS[field], best = '', bestScore = -1;
+    for (var i = 0; i < paths.length; i++) {
+      var p = paths[i];
+      var leaf = p.split('.').pop().toLowerCase();
+      var score = -1;
+      for (var j = 0; j < kws.length; j++) {
+        if (leaf === kws[j]) { score = Math.max(score, 100 - j); break; }
+        if (leaf.indexOf(kws[j]) !== -1) score = Math.max(score, 50 - j);
+      }
+      if (score < 0) continue;
+      var sample = rows.length ? getPath(rows[0], p) : null;
+      var txt = toText(sample);
+      if (field === 'message' && txt.length > 0) score += 6;
+      if (field === 'timestamp') score += isNaN(parseTime(sample)) ? -40 : 15;
+      if (field === 'sender' && txt.length > 0 && txt.length < 60) score += 6;
+      if (score > bestScore) { bestScore = score; best = p; }
+    }
+    if (best) res[field] = best;
+  }
+  if (!res.message) {
+    var bestLen = -1;
+    for (var k = 0; k < paths.length; k++) {
+      var total = 0, cnt = 0;
+      for (var r = 0; r < rows.length; r++) {
+        var val = getPath(rows[r], paths[k]);
+        if (typeof val === 'string' || Array.isArray(val)) { total += toText(val).length; cnt++; }
+      }
+      var avg = cnt ? total / cnt : -1;
+      if (avg > bestLen) { bestLen = avg; res.message = paths[k]; }
+    }
+  }
+  return res;
+}
+
+/* ---------- 解析入口 ---------- */
+function deepFindArray(obj, depth) {
+  if (Array.isArray(obj)) return obj;
+  if (!obj || typeof obj !== 'object' || depth > 3) return null;
+  var keys = Object.keys(obj), i;
+  for (i = 0; i < keys.length; i++) if (Array.isArray(obj[keys[i]]) && obj[keys[i]].length) return obj[keys[i]];
+  for (i = 0; i < keys.length; i++) {
+    var r = deepFindArray(obj[keys[i]], depth + 1);
+    if (r) return r;
+  }
+  return null;
+}
+
+function parseNDJSON(text) {
+  var lines = text.split('\n'), out = [], bad = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var s = lines[i].trim();
+    if (!s || s === '[' || s === ']') continue;
+    if (s.charAt(s.length - 1) === ',') s = s.slice(0, -1);
+    try { out.push(JSON.parse(s)); } catch (e) { bad++; }
+    if ((i & 8191) === 0) progress('parse', Math.min(95, i / lines.length * 100), '逐行解析');
+  }
+  if (!out.length) throw new Error('无法按 NDJSON 逐行解析（' + bad + ' 行失败）');
+  return out;
+}
+
+function doParse(text) {
+  progress('parse', 5, '解析 JSON');
+  var data = null, err = null;
+  try { data = JSON.parse(text); } catch (e) { err = e; }
+  if (data == null) {
+    if (text.indexOf('\n') !== -1) data = parseNDJSON(text);
+    else throw new Error('JSON 格式错误: ' + (err ? err.message : '未知'));
+  }
+  progress('parse', 60, '定位消息数组');
+
+  if (!Array.isArray(data)) {
+    var arr = deepFindArray(data, 0);
+    if (!arr) throw new Error('JSON 里没有找到消息数组');
+    data = arr;
+  }
+  var rows = new Array(data.length), n = 0;
+  for (var i = 0; i < data.length; i++) {
+    var it = data[i];
+    if (it == null) continue;
+    if (typeof it === 'string') rows[n++] = { text: it };
+    else if (typeof it === 'object' && !Array.isArray(it)) rows[n++] = it;
+  }
+  rows.length = n;
+  if (!n) throw new Error('数组里没有可用的消息对象');
+
+  RAW = rows;
+  progress('parse', 85, '扫描字段');
+
+  var paths = [], step = Math.max(1, Math.floor(n / 200));
+  for (var s = 0; s < n && paths.length < 200; s += step) collectPaths(rows[s], '', paths, 1);
+
+  post({ type: 'parsed', count: n, paths: paths, samples: rows.slice(0, 3), detected: detect(paths, rows.slice(0, 50)) });
+}
+
+/* ---------- 归一化 ---------- */
+function doNormalize(mapping, sortByTime) {
+  var n = RAW.length;
+  var texts = new Array(n);
+  var times = new Float64Array(n);
+  var senderIdx = new Int32Array(n);
+  var senderMap = Object.create(null), senders = [];
+  var i;
+
+  for (i = 0; i < n; i++) {
+    var row = RAW[i];
+    texts[i] = toText(getPath(row, mapping.message));
+    times[i] = mapping.timestamp ? parseTime(getPath(row, mapping.timestamp)) : NaN;
+    var sname = mapping.sender ? toText(getPath(row, mapping.sender)).trim() : '';
+    if (!sname) sname = '未署名';
+    var si = senderMap[sname];
+    if (si === undefined) {
+      si = senders.length;
+      senderMap[sname] = si;
+      senders.push({ name: sname, count: 0, first: NaN, last: NaN });
+    }
+    senderIdx[i] = si;
+    if ((i & 32767) === 0) progress('normalize', i / n * 60, '归一化');
+  }
+
+  if (sortByTime) {
+    var order = new Array(n);
+    for (i = 0; i < n; i++) order[i] = i;
+    order.sort(function (a, b) {
+      var ta = times[a], tb = times[b];
+      if (isNaN(ta) && isNaN(tb)) return a - b;
+      if (isNaN(ta)) return 1;
+      if (isNaN(tb)) return -1;
+      return ta === tb ? a - b : ta - tb;
+    });
+    var t2 = new Array(n), tm2 = new Float64Array(n), si2 = new Int32Array(n);
+    for (i = 0; i < n; i++) { var o = order[i]; t2[i] = texts[o]; tm2[i] = times[o]; si2[i] = senderIdx[o]; }
+    texts = t2; times = tm2; senderIdx = si2;
+    progress('normalize', 70, '按时间排序');
+  }
+
+  for (i = 0; i < n; i++) {
+    var sd = senders[senderIdx[i]];
+    sd.count++;
+    var tv = times[i];
+    if (!isNaN(tv)) {
+      if (isNaN(sd.first) || tv < sd.first) sd.first = tv;
+      if (isNaN(sd.last) || tv > sd.last) sd.last = tv;
+    }
+  }
+
+  buildIndex(texts);
+  RAW = null;
+
+  post({ type: 'normalized', texts: texts, times: times.buffer, senderIdx: senderIdx.buffer, senders: senders },
+       [times.buffer, senderIdx.buffer]);
+}
+
+/* ---------- 搜索索引：分块大字符串 + 原生 indexOf ---------- */
+function buildIndex(texts) {
+  CH = [];
+  var n = texts.length, i = 0;
+  while (i < n) {
+    var base = i, parts = [], offs = [], chars = 0, cur = 0;
+    while (i < n && parts.length < MSG_CHUNK && chars < CHAR_CHUNK) {
+      var t = texts[i].toLowerCase();
+      offs.push(cur);
+      parts.push(t);
+      cur += t.length + 1;
+      chars += t.length + 1;
+      i++;
+    }
+    offs.push(cur);
+    CH.push({ text: parts.join(SEP) + SEP, off: new Int32Array(offs), base: base, n: parts.length });
+    progress('index', i / n * 40 + 60, '建立搜索索引');
+  }
+}
+
+function locate(off, pos, n) {   // 最大的 j 使 off[j] <= pos
+  var lo = 0, hi = n - 1, ans = 0;
+  while (lo <= hi) {
+    var mid = (lo + hi) >> 1;
+    if (off[mid] <= pos) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return ans;
+}
+
+function doSearch(q, reqId) {
+  var needle = q.toLowerCase();
+  if (!needle) { post({ type: 'result', reqId: reqId, hits: new Int32Array(0).buffer, total: 0 }); return; }
+  var cap = 500000;
+  var out = new Int32Array(4096), len = 0;
+  for (var c = 0; c < CH.length; c++) {
+    var ck = CH[c], text = ck.text, off = ck.off, from = 0;
+    for (;;) {
+      var pos = text.indexOf(needle, from);
+      if (pos === -1) break;
+      var j = locate(off, pos, ck.n);
+      if (len === out.length) { var g = new Int32Array(out.length * 2); g.set(out); out = g; }
+      out[len++] = ck.base + j;
+      if (len >= cap) break;
+      from = Math.max(pos + needle.length, off[j + 1]);   // 跳到下一条消息
+    }
+    if (len >= cap) break;
+  }
+  var hits = out.slice(0, len);
+  post({ type: 'result', reqId: reqId, hits: hits.buffer, total: len, capped: len >= cap }, [hits.buffer]);
+}
+
+self.onmessage = function (e) {
+  var d = e.data;
+  try {
+    if (d.type === 'parse') doParse(d.text);
+    else if (d.type === 'normalize') doNormalize(d.mapping, d.sortByTime);
+    else if (d.type === 'reindex') { buildIndex(d.texts); post({ type: 'reindexed' }); }
+    else if (d.type === 'search') doSearch(d.q, d.reqId);
+  } catch (err) {
+    post({ type: 'error', message: (err && err.message) || String(err) });
+  }
+};
+</script>
+
+<style>
+  /* 头像色阶：只用黑白灰 */
+  .avatar.a0 { background:#171717; color:#fff; border-color:#171717 }
+  .avatar.a1 { background:#3d3d3d; color:#fff; border-color:#3d3d3d }
+  .avatar.a2 { background:#6b6b6b; color:#fff; border-color:#6b6b6b }
+  .avatar.a3 { background:#949494; color:#fff; border-color:#949494 }
+  .avatar.a4 { background:#c4c4c4; color:#141414; border-color:#c4c4c4 }
+  .avatar.a5 { background:#e8e8e8; color:#141414; border-color:#dcdcdc }
+  :root[data-theme="dark"] .avatar.a0 { background:#f0f0f0; color:#111; border-color:#f0f0f0 }
+  :root[data-theme="dark"] .avatar.a1 { background:#c9c9c9; color:#111; border-color:#c9c9c9 }
+  :root[data-theme="dark"] .avatar.a2 { background:#9a9a9a; color:#111; border-color:#9a9a9a }
+  :root[data-theme="dark"] .avatar.a3 { background:#6a6a6a; color:#fff; border-color:#6a6a6a }
+  :root[data-theme="dark"] .avatar.a4 { background:#414141; color:#f0f0f0; border-color:#414141 }
+  :root[data-theme="dark"] .avatar.a5 { background:#282828; color:#e0e0e0; border-color:#333 }
+
+  .loading {
+    position: fixed; inset: 0; background: var(--bg); z-index: 80;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    opacity: 0; pointer-events: none; transition: opacity .18s;
+  }
+  .loading.show { opacity: 1; pointer-events: auto; }
+  .loading .bar { width: 240px; }
+  .loading .lt { font-size: 13.5px; font-weight: 500; }
+  .loading .ls { font-size: 12px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+</style>
+
+<div class="loading" id="loading">
+  <svg class="i i-xl" style="color:var(--fg-2)"><use href="#i-db"/></svg>
+  <div class="lt" id="loadTitle">处理中</div>
+  <div class="progress bar"><div id="loadBar"></div></div>
+  <div class="ls" id="loadSub"></div>
+</div>
+
+<script>
+'use strict';
+/* =======================================================================
+   Chat Archive · 主线程
+   数据布局全部列式（texts / times / senderIdx），视图是一个 Int32Array 下标表。
+   渲染走 Fenwick 树支撑的变高虚拟列表，搜索走 Worker。
+   ======================================================================= */
+
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
+
+const S = {
+  texts: [],                 // string[]
+  times: new Float64Array(0),
+  senderIdx: new Int32Array(0),
+  senders: [],               // [{name,count,first,last}]
+  view: new Int32Array(0),   // 当前视图 -> 全局下标
+  sender: -1,                // -1 = 全部
+  query: '',
+  mode: 'filter',            // filter | locate
+  hits: null,                // Int32Array（全局下标，升序）
+  navHits: null,             // 叠加角色筛选后的命中
+  hitPos: -1,
+  expanded: new Set(),
+  heights: new Map(),        // 全局下标 -> 实测高度
+  avgCharW: 12,
+  mapping: {},
+  fileName: '',
+  parsed: null,
+  cached: false
+};
+
+/* ---------------- 基础工具 ---------------- */
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ESC[c]); }
+
+function hl(text, q) {
+  if (!q) return esc(text);
+  const lt = text.toLowerCase(), lq = q.toLowerCase();
+  let i = 0, pos, out = '', cnt = 0;
+  while (cnt < 300 && (pos = lt.indexOf(lq, i)) !== -1) {
+    out += esc(text.slice(i, pos)) + '<mark>' + esc(text.slice(pos, pos + q.length)) + '</mark>';
+    i = pos + q.length; cnt++;
+  }
+  return out + esc(text.slice(i));
+}
+
+const nf = new Intl.NumberFormat('zh-CN');
+const num = n => nf.format(n);
+
+const dtFull = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+const dtDay = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+const tcache = new Map();
+function fmtTime(ms) {
+  if (!isFinite(ms)) return '';
+  const k = Math.floor(ms / 60000);
+  let v = tcache.get(k);
+  if (v === undefined) {
+    v = dtFull.format(new Date(ms));
+    if (tcache.size > 3000) tcache.clear();
+    tcache.set(k, v);
+  }
+  return v;
+}
+function fmtDay(ms) { return isFinite(ms) ? dtDay.format(new Date(ms)) : ''; }
+
+function hashCode(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
+function initial(name) {
+  const c = (name || '?').trim().charAt(0);
+  return esc(/[a-z]/i.test(c) ? c.toUpperCase() : c);
+}
+
+let toastTimer = 0;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function showLoading(title, sub, pct) {
+  $('#loadTitle').textContent = title;
+  $('#loadSub').textContent = sub || '';
+  $('#loadBar').style.width = (pct == null ? 0 : pct) + '%';
+  $('#loading').classList.add('show');
+}
+function hideLoading() { $('#loading').classList.remove('show'); }
+
+function openModal(id) { $(id).classList.add('open'); }
+function closeModal(id) { $(id).classList.remove('open'); }
+$$('.overlay').forEach(ov => {
+  ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
+  $$('[data-close]', ov).forEach(b => b.addEventListener('click', () => ov.classList.remove('open')));
+});
+
+/* ---------------- 主题 ---------------- */
+(function initTheme() {
+  let t = null;
+  try { t = localStorage.getItem('ca-theme'); } catch (e) {}
+  if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.dataset.theme = t;
+})();
+$('#btnTheme').addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('ca-theme', next); } catch (e) {}
+});
+
+/* ---------------- Fenwick 树（前缀高度） ---------------- */
+class Fenwick {
+  constructor(n) {
+    this.n = n; this.t = new Float64Array(n + 1); this.sum = 0;
+    this.LOG = 0; while ((1 << (this.LOG + 1)) <= n) this.LOG++;
+  }
+  buildFrom(h) {
+    const t = this.t, n = this.n; let s = 0;
+    for (let i = 1; i <= n; i++) {
+      t[i] += h[i - 1]; s += h[i - 1];
+      const j = i + (i & -i);
+      if (j <= n) t[j] += t[i];
+    }
+    this.sum = s;
+  }
+  add(i, d) { this.sum += d; for (let x = i + 1; x <= this.n; x += x & -x) this.t[x] += d; }
+  prefix(i) { let s = 0; for (let x = i; x > 0; x -= x & -x) s += this.t[x]; return s; }
+  find(v) {                        // 最大的 pos 使 prefix(pos) <= v
+    let pos = 0, rem = v;
+    for (let pw = 1 << this.LOG; pw > 0; pw >>= 1) {
+      const np = pos + pw;
+      if (np <= this.n && this.t[np] <= rem + 1e-6) { rem -= this.t[np]; pos = np; }
+    }
+    return pos;
+  }
+}
+
+/* ---------------- 变高虚拟列表 ---------------- */
+const OVERSCAN = 700;
+// 浏览器对单个元素的高度有上限（Chrome 约 3.3e7px，Firefox 约 1.8e7px）。
+// 超过阈值后把滚动空间压缩，用 scale 在「滚动坐标」和「虚拟坐标」之间换算，
+// 否则百万级数据的后半段永远滚不到。
+const MAXH = 15000000;
+
+class VList {
+  constructor(vp, spacer, renderFn) {
+    this.vp = vp; this.spacer = spacer; this.renderFn = renderFn;
+    this.n = 0; this.h = new Float64Array(0); this.fen = new Fenwick(0);
+    this.nodes = new Map(); this.raf = 0; this.busy = false; this.estOf = () => 60;
+    this.total = 0; this.scale = 1; this.vTop = 0;
+    vp.addEventListener('scroll', () => this.onScroll(), { passive: true });
+    let w = vp.clientWidth;
+    new ResizeObserver(() => {
+      if (vp.clientWidth !== w) { w = vp.clientWidth; this.remeasureAll(); }
+      else { this.applySpace(); this.schedule(); }
+    }).observe(vp);
+  }
+  applySpace() {
+    const vh = this.vp.clientHeight;
+    this.total = this.fen.sum;
+    const spaceH = Math.min(this.total, MAXH);
+    this.scale = this.total > MAXH ? Math.max(1, (this.total - vh) / Math.max(1, spaceH - vh)) : 1;
+    this.spacer.style.height = Math.round(spaceH) + 'px';
+  }
+  syncVTop() {
+    this.vTop = this.scale === 1 ? this.vp.scrollTop : Math.min(this.total, this.vp.scrollTop * this.scale);
+  }
+  onScroll() { this.syncVTop(); this.schedule(); onScrollExtra(); }
+  toScroll(v) { return this.scale === 1 ? v : v / this.scale; }
+
+  setCount(n, estOf) {
+    this.estOf = estOf;
+    this.clear();
+    this.n = n;
+    this.h = new Float64Array(n);
+    for (let i = 0; i < n; i++) this.h[i] = estOf(i);
+    this.fen = new Fenwick(n);
+    this.fen.buildFrom(this.h);
+    this.applySpace();
+    this.vp.scrollTop = 0;
+    this.vTop = 0;
+    this.draw();
+  }
+  clear() { this.nodes.forEach(el => el.remove()); this.nodes.clear(); }
+  invalidate(i) {
+    const el = this.nodes.get(i);
+    if (el) { el.remove(); this.nodes.delete(i); }
+    this.draw();
+  }
+  remeasureAll() {
+    if (!this.n) return;
+    const anchor = Math.min(this.n - 1, this.fen.find(this.vTop));
+    const delta = this.vTop - this.fen.prefix(anchor);
+    S.heights.clear();
+    for (let i = 0; i < this.n; i++) this.h[i] = this.estOf(i);
+    this.fen = new Fenwick(this.n);
+    this.fen.buildFrom(this.h);
+    this.applySpace();
+    this.clear();
+    this.vTop = Math.max(0, this.fen.prefix(anchor) + delta);
+    this.vp.scrollTop = this.toScroll(this.vTop);
+    this.syncVTop();
+    this.draw();
+  }
+  schedule() {
+    if (this.raf) return;
+    this.raf = requestAnimationFrame(() => { this.raf = 0; this.draw(); });
+  }
+  setHeight(i, hh) {
+    const d = hh - this.h[i];
+    if (Math.abs(d) < 0.5) return false;
+    this.h[i] = hh; this.fen.add(i, d);
+    return true;
+  }
+  firstVisible() { return this.n ? Math.min(this.n - 1, this.fen.find(this.vTop + 4)) : -1; }
+  scrollToIndex(i, pad) {
+    if (i < 0 || i >= this.n) return;
+    const v = Math.max(0, this.fen.prefix(i) - (pad == null ? 90 : pad));
+    this.vp.scrollTop = this.toScroll(v);
+    this.syncVTop();
+    this.draw();
+  }
+  draw() {
+    if (this.busy) return;
+    this.busy = true;
+    const vp = this.vp, vh = vp.clientHeight;
+    const vTop = this.vTop;
+    const start = Math.max(0, Math.min(this.n, this.fen.find(Math.max(0, vTop - OVERSCAN))));
+    const limit = vTop + vh + OVERSCAN;
+    const want = [];
+    let idx = start, off = this.fen.prefix(start);
+    while (idx < this.n && off < limit) { want.push(idx); off += this.h[idx]; idx++; }
+
+    const keep = new Set(want);
+    this.nodes.forEach((el, i) => { if (!keep.has(i)) { el.remove(); this.nodes.delete(i); } });
+    for (let k = 0; k < want.length; k++) {
+      const i = want[k];
+      if (!this.nodes.has(i)) {
+        const el = this.renderFn(i);
+        this.spacer.appendChild(el);
+        this.nodes.set(i, el);
+      }
+    }
+
+    const anchor = want.length ? want[0] : 0;
+    const before = this.fen.prefix(anchor);
+    let changed = false;
+    this.nodes.forEach((el, i) => { if (this.setHeight(i, el.offsetHeight)) changed = true; });
+    if (changed) {
+      const after = this.fen.prefix(anchor);
+      if (this.scale === 1) {
+        if (after !== before) {
+          vp.scrollTop = Math.max(0, vp.scrollTop + (after - before));
+          this.vTop = vp.scrollTop;
+        }
+        this.applySpace();
+      } else {
+        this.vTop = Math.max(0, vTop + (after - before));
+        this.applySpace();
+      }
+    }
+    const base = vp.scrollTop - this.vTop;
+    this.nodes.forEach((el, i) => { el.style.transform = 'translateY(' + (this.fen.prefix(i) + base).toFixed(2) + 'px)'; });
+    this.busy = false;
+    if (changed) this.schedule();
+  }
+}
+
+/* ---------------- 行渲染 ---------------- */
+const CLAMP_AT = 1400;
+const viewport = $('#viewport'), spacer = $('#spacer');
+
+function estimate(vi) {
+  const gi = S.view[vi];
+  const cached = S.heights.get(gi);
+  if (cached !== undefined) return cached;
+  const w = Math.max(220, viewport.clientWidth - 48 - 41 - 12);
+  const cpl = Math.max(8, w / S.avgCharW);
+  const len = S.texts[gi].length;
+  let lines = Math.max(1, Math.ceil(len / cpl));
+  const clamp = len > CLAMP_AT && !S.expanded.has(gi);
+  if (clamp) lines = 6;
+  return 18 + 18 + lines * 22.7 + (clamp ? 22 : 0);
+}
+
+function renderRow(vi) {
+  const gi = S.view[vi];
+  const sIdx = S.senderIdx[gi];
+  const name = S.senders[sIdx] ? S.senders[sIdx].name : '未署名';
+  const text = S.texts[gi];
+  const clamp = text.length > CLAMP_AT && !S.expanded.has(gi);
+  const isHit = S.query && S.navHits && binaryHas(S.navHits, gi);
+  const lvl = hashCode(name) % 6;
+  const t = S.times[gi];
+
+  const el = document.createElement('div');
+  el.className = 'row';
+  el.dataset.gi = gi;
+  el.dataset.vi = vi;
+  el.innerHTML =
+    '<div class="msg' + (isHit ? ' hit' : '') + '">' +
+      '<div class="avatar a' + lvl + '">' + initial(name) + '</div>' +
+      '<div class="msg-body">' +
+        '<div class="msg-head">' +
+          '<span class="msg-name">' + esc(name) + '</span>' +
+          '<span class="msg-time">' + fmtTime(t) + '</span>' +
+          '<span class="msg-idx">#' + (gi + 1) + '</span>' +
+        '</div>' +
+        '<div class="msg-text' + (clamp ? ' clamped' : '') + '">' + hl(text, S.query) + '</div>' +
+        (clamp ? '<button class="msg-more">展开全文（' + num(text.length) + ' 字）</button>' : '') +
+      '</div>' +
+    '</div>';
+  return el;
+}
+
+const vlist = new VList(viewport, spacer, renderRow);
+
+spacer.addEventListener('click', e => {
+  const btn = e.target.closest('.msg-more');
+  if (!btn) return;
+  const row = btn.closest('.row');
+  const gi = +row.dataset.gi, vi = +row.dataset.vi;
+  S.expanded.add(gi);
+  S.heights.delete(gi);
+  vlist.invalidate(vi);
+});
+
+/* 顶部日期胶囊 */
+let dateTimer = 0;
+function onScrollExtra() {
+  const chip = $('#dateChip');
+  const vi = vlist.firstVisible();
+  if (vi < 0) return;
+  const d = fmtDay(S.times[S.view[vi]]);
+  if (!d) { chip.classList.remove('show'); return; }
+  chip.textContent = d;
+  chip.classList.add('show');
+  clearTimeout(dateTimer);
+  dateTimer = setTimeout(() => chip.classList.remove('show'), 1100);
+}
+
+function binaryHas(arr, v) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (arr[m] === v) return true; if (arr[m] < v) lo = m + 1; else hi = m - 1; }
+  return false;
+}
+function viewIndexOf(gi) {
+  const a = S.view;
+  let lo = 0, hi = a.length - 1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (a[m] === gi) return m; if (a[m] < gi) lo = m + 1; else hi = m - 1; }
+  return -1;
+}
+
+/* ---------------- Worker（带主线程回退） ---------------- */
+const WORKER_SRC = document.getElementById('workerSrc').textContent;
+
+class InlineWorker {                    // file:// 下 Blob Worker 被拦截时的回退
+  constructor(src) {
+    this.onmessage = null;
+    const outer = this;
+    this._self = { postMessage(m) { if (outer.onmessage) outer.onmessage({ data: m }); }, onmessage: null };
+    new Function('self', src)(this._self);
+  }
+  postMessage(m) { const s = this._self; if (s.onmessage) s.onmessage({ data: m }); }
+}
+
+let worker = null, lastMsg = null, workerFellBack = false;
+
+function spawnWorker() {
+  try {
+    const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+    worker = new Worker(url);
+    worker.onerror = e => {
+      if (workerFellBack) return;
+      workerFellBack = true;
+      try { worker.terminate(); } catch (err) {}
+      worker = new InlineWorker(WORKER_SRC);
+      worker.onmessage = onWorkerMessage;
+      if (lastMsg) setTimeout(() => worker.postMessage(lastMsg), 0);
+    };
+  } catch (e) {
+    workerFellBack = true;
+    worker = new InlineWorker(WORKER_SRC);
+  }
+  worker.onmessage = onWorkerMessage;
+}
+function wpost(m) { lastMsg = m; worker.postMessage(m); }
+spawnWorker();
+
+let searchT0 = 0, lastReq = 0, lastSearchMs = 0;
+
+function onWorkerMessage(e) {
+  const d = e.data;
+  if (d.type === 'progress') {
+    showLoading($('#loadTitle').textContent, d.note, Math.round(d.pct));
+  } else if (d.type === 'parsed') {
+    hideLoading();
+    S.parsed = d;
+    buildMapUI(d);
+    openModal('#mapModal');
+  } else if (d.type === 'normalized') {
+    applyNormalized(d);
+  } else if (d.type === 'reindexed') {
+    hideLoading();
+  } else if (d.type === 'result') {
+    if (d.reqId !== lastReq) return;
+    lastSearchMs = Math.round(performance.now() - searchT0);
+    S.hits = new Int32Array(d.hits);
+    if (d.capped) toast('结果过多，只显示前 50 万条匹配');
+    rebuildView();
+  } else if (d.type === 'error') {
+    hideLoading();
+    toast('出错：' + d.message);
+  }
+}
+
+/* ---------------- 视图构建 ---------------- */
+function identityView(n) { const a = new Int32Array(n); for (let i = 0; i < n; i++) a[i] = i; return a; }
+
+function filterBySender(a) {
+  if (S.sender < 0) return a;
+  const out = new Int32Array(a.length), si = S.senderIdx;
+  let k = 0;
+  for (let i = 0; i < a.length; i++) { const g = a[i]; if (si[g] === S.sender) out[k++] = g; }
+  return out.subarray(0, k).slice();
+}
+
+function senderView(s) {
+  const n = S.texts.length, si = S.senderIdx;
+  const out = new Int32Array(S.senders[s].count);
+  let k = 0;
+  for (let i = 0; i < n; i++) if (si[i] === s) out[k++] = i;
+  return k === out.length ? out : out.subarray(0, k).slice();
+}
+
+function rebuildView() {
+  const n = S.texts.length;
+  S.navHits = S.query && S.hits ? filterBySender(S.hits) : null;
+
+  let arr;
+  if (S.query && S.mode === 'filter') arr = S.navHits || new Int32Array(0);
+  else if (S.sender < 0) arr = identityView(n);
+  else arr = senderView(S.sender);
+
+  S.view = arr;
+  S.hitPos = -1;
+  vlist.setCount(arr.length, estimate);
+  updateBars();
+}
+
+function updateBars() {
+  const total = S.texts.length;
+  const title = S.sender < 0 ? '全部消息' : S.senders[S.sender].name;
+  $('#viewTitle').textContent = title;
+
+  const parts = [];
+  if (!total) parts.push('尚未导入数据');
+  else {
+    parts.push(num(S.view.length) + ' 条');
+    if (S.sender >= 0) parts.push('共 ' + num(total) + ' 条中');
+    else parts.push(num(S.senders.length) + ' 位角色');
+    if (S.query) parts.push('搜索 “' + S.query + '” · ' + lastSearchMs + ' ms');
+  }
+  $('#viewSub').textContent = parts.join(' · ');
+
+  const has = !!(S.query && S.navHits);
+  $('#hitChip').hidden = !has;
+  $('#modeSeg').hidden = !S.query;
+  if (has) updateHitLabel();
+  $('#empty').style.display = total ? 'none' : '';
+
+  const blank = total > 0 && S.view.length === 0;
+  $('#noHit').style.display = blank ? '' : 'none';
+  if (blank) {
+    $('#noHitSub').textContent = S.query
+      ? '「' + S.query + '」在' + (S.sender < 0 ? '全部消息' : '「' + S.senders[S.sender].name + '」') + '里没有结果'
+      : '这个角色没有消息';
+  }
+}
+
+function updateHitLabel() {
+  const h = S.navHits || [];
+  $('#hitLabel').textContent = (S.hitPos < 0 ? '—' : S.hitPos + 1) + ' / ' + num(h.length);
+  $('#hitPrev').disabled = $('#hitNext').disabled = !h.length;
+}
+
+function gotoHit(dir) {
+  const h = S.navHits;
+  if (!h || !h.length) return;
+  S.hitPos = S.hitPos < 0 ? (dir > 0 ? 0 : h.length - 1) : (S.hitPos + dir + h.length) % h.length;
+  const gi = h[S.hitPos];
+  const vi = S.mode === 'filter' ? S.hitPos : viewIndexOf(gi);
+  if (vi >= 0) vlist.scrollToIndex(vi, Math.round(viewport.clientHeight / 3));
+  updateHitLabel();
+}
+
+/* ---------------- 角色侧栏 ---------------- */
+function roleButton(name, count, sub, active, onClick) {
+  const b = document.createElement('button');
+  b.className = 'role' + (active ? ' active' : '');
+  b.innerHTML =
+    '<span class="avatar' + (name === null ? ' sq' : '') + ' a' + (name === null ? 5 : hashCode(name) % 6) + '">' +
+      (name === null ? '<svg class="i"><use href="#i-msg"/></svg>' : initial(name)) + '</span>' +
+    '<span class="role-meta"><span class="role-name">' + esc(name === null ? '全部消息' : name) + '</span>' +
+    (sub ? '<span class="role-sub">' + esc(sub) + '</span>' : '') + '</span>' +
+    '<span class="role-count">' + num(count) + '</span>';
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+function renderRoles() {
+  const list = $('#roleList');
+  const kw = $('#roleFilter').value.trim().toLowerCase();
+  list.innerHTML = '';
+  if (!S.senders.length) return;
+
+  const frag = document.createDocumentFragment();
+  if (!kw) frag.appendChild(roleButton(null, S.texts.length, '', S.sender < 0, () => selectSender(-1)));
+
+  const order = S.senders.map((s, i) => i).sort((a, b) => S.senders[b].count - S.senders[a].count);
+  let shown = 0;
+  for (let k = 0; k < order.length; k++) {
+    const i = order[k], s = S.senders[i];
+    if (kw && s.name.toLowerCase().indexOf(kw) === -1) continue;
+    if (shown >= 600) break;
+    const sub = isFinite(s.first) ? fmtDay(s.first) + ' – ' + fmtDay(s.last) : '';
+    frag.appendChild(roleButton(s.name, s.count, sub, S.sender === i, () => selectSender(i)));
+    shown++;
+  }
+  list.appendChild(frag);
+  if (shown === 0) {
+    const d = document.createElement('div');
+    d.className = 'role-sub';
+    d.style.padding = '10px 8px';
+    d.textContent = '没有匹配的角色';
+    list.appendChild(d);
+  }
+  $('#roleTotal').textContent = num(S.senders.length);
+}
+
+function selectSender(i) {
+  S.sender = i;
+  rebuildView();
+  renderRoles();
+  $('#sidebar').classList.remove('open');
+}
+
+$('#roleFilter').addEventListener('input', renderRoles);
+$('#btnSide').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+
+/* ---------------- 搜索交互 ---------------- */
+const qInput = $('#q');
+let searchTimer = 0;
+
+qInput.addEventListener('input', () => {
+  $('#qClear').hidden = !qInput.value;
+  clearTimeout(searchTimer);
+  const v = qInput.value;
+  searchTimer = setTimeout(() => runSearch(v), 180);
+});
+qInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); gotoHit(e.shiftKey ? -1 : 1); }
+  if (e.key === 'Escape') { qInput.value = ''; $('#qClear').hidden = true; runSearch(''); }
+});
+$('#qClear').addEventListener('click', () => { qInput.value = ''; $('#qClear').hidden = true; qInput.focus(); runSearch(''); });
+$('#hitNext').addEventListener('click', () => gotoHit(1));
+$('#hitPrev').addEventListener('click', () => gotoHit(-1));
+
+$$('#modeSeg button').forEach(b => b.addEventListener('click', () => {
+  $$('#modeSeg button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  S.mode = b.dataset.mode;
+  rebuildView();
+}));
+
+function runSearch(v) {
+  const q = v.trim();
+  if (q === S.query) return;
+  S.query = q;
+  if (!q) { S.hits = null; rebuildView(); return; }
+  if (!S.texts.length) return;
+  searchT0 = performance.now();
+  wpost({ type: 'search', q: q, reqId: ++lastReq });
+}
+
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); qInput.focus(); qInput.select(); }
+  if (e.key === 'Escape') $$('.overlay.open').forEach(o => o.classList.remove('open'));
+});
+
+/* ---------------- 导入 ---------------- */
+function readFile(file) {
+  if (!file) return;
+  S.fileName = file.name;
+  showLoading('读取文件', file.name + ' · ' + (file.size / 1048576).toFixed(1) + ' MB', 3);
+  file.text().then(txt => {
+    showLoading('解析中', '', 5);
+    wpost({ type: 'parse', text: txt });
+  }).catch(err => { hideLoading(); toast('读取失败：' + err.message); });
+}
+
+$('#fileInput').addEventListener('change', e => { readFile(e.target.files[0]); e.target.value = ''; });
+$('#btnPick').addEventListener('click', () => $('#fileInput').click());
+$('#dropzone').addEventListener('click', e => { if (e.target.closest('button')) return; $('#fileInput').click(); });
+$('#btnImport').addEventListener('click', () => $('#fileInput').click());
+$('#btnImportSm').addEventListener('click', () => $('#fileInput').click());
+$('#btnPaste').addEventListener('click', e => { e.stopPropagation(); openModal('#pasteModal'); });
+
+['dragenter', 'dragover'].forEach(ev => window.addEventListener(ev, e => {
+  e.preventDefault(); $('#dropzone').classList.add('over');
+}));
+['dragleave', 'drop'].forEach(ev => window.addEventListener(ev, e => {
+  e.preventDefault(); if (ev === 'drop' || e.target === document.documentElement) $('#dropzone').classList.remove('over');
+}));
+window.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) readFile(f);
+});
+
+$('#btnSample').addEventListener('click', () => {
+  const names = ['林岸', '沈砚', '旁白'];
+  const lines = [];
+  const base = Date.UTC(2024, 0, 1) / 1000;
+  const words = ['今天的风很大，窗户一直在响。', '你说的那本书我找到了。', '嗯，明天见。',
+    '其实我一直想问你一件事。', '先把这段记录下来吧。', '好久没有这样安静地待着了。'];
+  for (let i = 0; i < 60; i++) {
+    lines.push({ role: names[i % 3], content: words[i % words.length] + '（第 ' + (i + 1) + ' 句）', ts: base + i * 137 });
+  }
+  $('#pasteInput').value = JSON.stringify(lines, null, 2);
+});
+
+$('#btnPasteGo').addEventListener('click', () => {
+  const txt = $('#pasteInput').value.trim();
+  if (!txt) { toast('请先粘贴 JSON'); return; }
+  closeModal('#pasteModal');
+  S.fileName = '粘贴的数据';
+  showLoading('解析中', '', 5);
+  wpost({ type: 'parse', text: txt });
+});
+
+/* ---------------- 字段映射 ---------------- */
+function buildMapUI(d) {
+  $('#mapStat').textContent = '解析出 ' + num(d.count) + ' 条记录 · ' + d.paths.length + ' 个候选字段' +
+    (S.fileName ? ' · ' + S.fileName : '');
+
+  const fields = [
+    { k: 'message', label: '消息内容', req: true },
+    { k: 'sender', label: '发送者' },
+    { k: 'timestamp', label: '时间戳' }
+  ];
+  let html = '';
+  fields.forEach(f => {
+    html += '<div class="maprow"><label class="label" for="map_' + f.k + '">' + f.label +
+      (f.req ? ' <span style="color:var(--fg-3)">必填</span>' : '') + '</label><select id="map_' + f.k + '">';
+    if (!f.req) html += '<option value="">— 不使用 —</option>';
+    d.paths.forEach(p => {
+      const sel = d.detected[f.k] === p ? ' selected' : '';
+      html += '<option value="' + esc(p) + '"' + sel + '>' + esc(p) + '</option>';
+    });
+    html += '</select></div>';
+  });
+  $('#mapRows').innerHTML = html;
+  $('#mapMsg').textContent = '';
+
+  let sample = '';
+  try { sample = JSON.stringify(d.samples[0], null, 2); } catch (e) { sample = '(无法显示)'; }
+  if (sample.length > 4000) sample = sample.slice(0, 4000) + '\n…';
+  $('#mapSample').textContent = sample;
+}
+
+$('#btnMapGo').addEventListener('click', () => {
+  const mapping = {
+    message: $('#map_message').value,
+    sender: $('#map_sender') ? $('#map_sender').value : '',
+    timestamp: $('#map_timestamp') ? $('#map_timestamp').value : ''
+  };
+  if (!mapping.message) { $('#mapMsg').textContent = '必须选择消息内容字段'; return; }
+  S.mapping = mapping;
+  closeModal('#mapModal');
+  showLoading('载入中', '归一化', 0);
+  wpost({ type: 'normalize', mapping: mapping, sortByTime: $('#optSort').checked });
+});
+
+function computeAvgCharW() {
+  const n = S.texts.length;
+  if (!n) { S.avgCharW = 12; return; }
+  let cjk = 0, other = 0;
+  const step = Math.max(1, Math.floor(n / 300));
+  for (let i = 0; i < n; i += step) {
+    const t = S.texts[i];
+    for (let j = 0, L = Math.min(t.length, 200); j < L; j++) {
+      if (t.charCodeAt(j) > 0x2e80) cjk++; else other++;
+    }
+  }
+  const total = cjk + other || 1;
+  S.avgCharW = 7.4 + (cjk / total) * 6.8;
+}
+
+function applyNormalized(d) {
+  S.texts = d.texts;
+  S.times = new Float64Array(d.times);
+  S.senderIdx = new Int32Array(d.senderIdx);
+  S.senders = d.senders;
+  S.expanded.clear();
+  S.heights.clear();
+  S.hits = null; S.navHits = null; S.hitPos = -1; S.sender = -1;
+  S.query = ''; qInput.value = ''; $('#qClear').hidden = true;
+  computeAvgCharW();
+  renderRoles();
+  rebuildView();
+  hideLoading();
+  toast('已载入 ' + num(S.texts.length) + ' 条消息 · ' + num(S.senders.length) + ' 位角色');
+  if ($('#optCache').checked) saveCache(); else updateCacheInfo(null);
+}
+
+/* ---------------- IndexedDB 本地缓存 ---------------- */
+const DBN = 'chat-archive', STORE = 'kv', TXT_CHUNK = 20000;
+
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DBN, 1);
+    r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function runTx(db, mode, fn) {
+  return new Promise((res, rej) => {
+    const t = db.transaction(STORE, mode);
+    const out = fn(t.objectStore(STORE));
+    t.oncomplete = () => res(out);
+    t.onerror = () => rej(t.error);
+    t.onabort = () => rej(t.error);
+  });
+}
+function reqP(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+
+async function saveCache() {
+  try {
+    const db = await idbOpen();
+    const n = S.texts.length;
+    const chunks = Math.ceil(n / TXT_CHUNK);
+    const meta = {
+      count: n, chunks: chunks, senders: S.senders, mapping: S.mapping,
+      fileName: S.fileName, savedAt: Date.now(), avgCharW: S.avgCharW
+    };
+    await runTx(db, 'readwrite', st => {
+      st.clear();
+      st.put(meta, 'meta');
+      st.put({ times: S.times, senderIdx: S.senderIdx }, 'cols');
+      for (let c = 0; c < chunks; c++) st.put(S.texts.slice(c * TXT_CHUNK, (c + 1) * TXT_CHUNK), 'txt:' + c);
+    });
+    updateCacheInfo(meta);
+  } catch (e) {
+    updateCacheInfo(null);
+    toast('缓存失败：' + (e && e.message ? e.message : e));
+  }
+}
+
+async function loadCache() {
+  const db = await idbOpen();
+  const meta = await runTx(db, 'readonly', st => reqP(st.get('meta')));
+  const m = await meta;
+  if (!m || !m.count) return null;
+  const res = await runTx(db, 'readonly', st => {
+    const cols = reqP(st.get('cols'));
+    const parts = [];
+    for (let c = 0; c < m.chunks; c++) parts.push(reqP(st.get('txt:' + c)));
+    return { cols, parts };
+  });
+  const cols = await res.cols;
+  const parts = await Promise.all(res.parts);
+  let texts = [];
+  for (let i = 0; i < parts.length; i++) if (parts[i]) texts = texts.concat(parts[i]);
+  if (!cols || texts.length !== m.count) return null;
+  return { meta: m, texts: texts, times: cols.times, senderIdx: cols.senderIdx };
+}
+
+function updateCacheInfo(meta) {
+  S.cached = !!meta;
+  $('#cacheInfo').textContent = meta
+    ? num(meta.count) + ' 条 · ' + fmtDay(meta.savedAt)
+    : '未缓存';
+}
+
+$('#btnClearCache').addEventListener('click', async () => {
+  if (!confirm('清除本地缓存？下次打开需要重新导入。')) return;
+  try {
+    const db = await idbOpen();
+    await runTx(db, 'readwrite', st => st.clear());
+    updateCacheInfo(null);
+    toast('缓存已清除');
+  } catch (e) { toast('清除失败'); }
+});
+
+/* ---------------- 导出 ---------------- */
+let expScope = 'view';
+$$('#scopeSeg button').forEach(b => b.addEventListener('click', () => {
+  $$('#scopeSeg button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  expScope = b.dataset.scope;
+  updateScopeHint();
+}));
+function updateScopeHint() {
+  const n = expScope === 'view' ? S.view.length : S.texts.length;
+  const where = expScope === 'view'
+    ? (S.sender < 0 ? '全部角色' : S.senders[S.sender].name) + (S.query ? ' · 搜索「' + S.query + '」' : '')
+    : '不受角色筛选和搜索影响';
+  $('#scopeHint').textContent = num(n) + ' 条 · ' + where;
+}
+$('#btnExport').addEventListener('click', () => {
+  if (!S.texts.length) { toast('还没有数据'); return; }
+  updateScopeHint();
+  openModal('#exportModal');
+});
+
+function exportIndices() {
+  return expScope === 'view' ? S.view : identityView(S.texts.length);
+}
+
+function download(content, filename, mime) {
+  const blob = new Blob([content], { type: mime + ';charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  closeModal('#exportModal');
+  toast('已生成 ' + filename);
+}
+function stamp() {
+  const d = new Date(), p = x => String(x).padStart(2, '0');
+  return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
+}
+function bigConfirm(n) {
+  return n <= 200000 || confirm(num(n) + ' 条消息，生成文件可能需要几秒并占用较多内存。继续？');
+}
+
+$('#expMD').addEventListener('click', () => {
+  const v = exportIndices();
+  if (!bigConfirm(v.length)) return;
+  const showTime = $('#expTime').checked, showIdx = $('#expIndex').checked;
+  const out = ['# 聊天记录', '', '> ' + num(v.length) + ' 条 · 导出于 ' + fmtTime(Date.now()), ''];
+  for (let i = 0; i < v.length; i++) {
+    const g = v[i];
+    const nm = S.senders[S.senderIdx[g]].name;
+    let head = '**' + nm + '**';
+    if (showTime && isFinite(S.times[g])) head += ' · *' + fmtTime(S.times[g]) + '*';
+    if (showIdx) head += ' · `#' + (g + 1) + '`';
+    out.push(head + '  ', S.texts[g].replace(/\n/g, '\n'), '');
+  }
+  download(out.join('\n'), 'chat-' + stamp() + '.md', 'text/markdown');
+});
+
+$('#expTXT').addEventListener('click', () => {
+  const v = exportIndices();
+  if (!bigConfirm(v.length)) return;
+  const showTime = $('#expTime').checked;
+  const out = [];
+  for (let i = 0; i < v.length; i++) {
+    const g = v[i];
+    const nm = S.senders[S.senderIdx[g]].name;
+    const ts = showTime && isFinite(S.times[g]) ? '[' + fmtTime(S.times[g]) + '] ' : '';
+    out.push(ts + nm + ': ' + S.texts[g]);
+  }
+  download(out.join('\n'), 'chat-' + stamp() + '.txt', 'text/plain');
+});
+
+$('#expJSON').addEventListener('click', () => {
+  const v = exportIndices();
+  if (!bigConfirm(v.length)) return;
+  const showTime = $('#expTime').checked, showIdx = $('#expIndex').checked;
+  const arr = new Array(v.length);
+  for (let i = 0; i < v.length; i++) {
+    const g = v[i];
+    const o = { sender: S.senders[S.senderIdx[g]].name, message: S.texts[g] };
+    if (showTime) o.timestamp = isFinite(S.times[g]) ? new Date(S.times[g]).toISOString() : null;
+    if (showIdx) o.index = g + 1;
+    arr[i] = o;
+  }
+  download(JSON.stringify(arr, null, 1), 'chat-' + stamp() + '.json', 'application/json');
+});
+
+$('#expHTML').addEventListener('click', () => {
+  const v = exportIndices();
+  if (!bigConfirm(v.length)) return;
+  const showTime = $('#expTime').checked, showIdx = $('#expIndex').checked;
+
+  const used = [], remap = new Map();
+  const s = new Array(v.length), m = new Array(v.length), t = showTime ? new Array(v.length) : null;
+  const idx = showIdx ? new Array(v.length) : null;
+  for (let i = 0; i < v.length; i++) {
+    const g = v[i], si = S.senderIdx[g];
+    let r = remap.get(si);
+    if (r === undefined) { r = used.length; remap.set(si, r); used.push(S.senders[si].name); }
+    s[i] = r;
+    m[i] = S.texts[g];
+    if (t) t[i] = isFinite(S.times[g]) ? S.times[g] : null;
+    if (idx) idx[i] = g + 1;
+  }
+  const title = S.sender < 0 ? '聊天记录' : S.senders[S.sender].name;
+  const payload = { title: title, names: used, s: s, m: m, t: t, idx: idx };
+  const json = JSON.stringify(payload).replace(/<\//g, '<\\/').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+
+  const css = document.getElementById('exportCSS').textContent;
+  const js = document.getElementById('exportJS').textContent;
+  const html =
+    '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+    '<title>' + esc(title) + '</title>\n<style>' + css + '</style>\n</head>\n<body>\n' +
+    '<header class="hd"><div class="ttl">' + esc(title) + '</div>' +
+    '<div class="sub" id="sub"></div>' +
+    '<div class="ctl"><select id="role"></select>' +
+    '<input id="q" type="text" placeholder="搜索关键词" autocomplete="off"><span class="cnt" id="cnt"></span></div>' +
+    '</header>\n<main id="list"></main>\n' +
+    '<script id="D" type="application/json">' + json + '<\/script>\n' +
+    '<script>' + js + '<\/script>\n</body>\n</html>';
+
+  download(html, 'chat-' + stamp() + '.html', 'text/html');
+});
+
+/* ---------------- 启动 ---------------- */
+(async function init() {
+  updateBars();
+  renderRoles();
+  try {
+    const c = await loadCache();
+    if (!c) { updateCacheInfo(null); return; }
+    updateCacheInfo(c.meta);
+    showLoading('恢复本地缓存', num(c.meta.count) + ' 条消息', 10);
+    S.texts = c.texts;
+    S.times = c.times instanceof Float64Array ? c.times : new Float64Array(c.times);
+    S.senderIdx = c.senderIdx instanceof Int32Array ? c.senderIdx : new Int32Array(c.senderIdx);
+    S.senders = c.meta.senders;
+    S.mapping = c.meta.mapping || {};
+    S.fileName = c.meta.fileName || '';
+    S.avgCharW = c.meta.avgCharW || 12;
+    renderRoles();
+    rebuildView();
+    wpost({ type: 'reindex', texts: S.texts });
+  } catch (e) {
+    hideLoading();
+    updateCacheInfo(null);
+  }
+})();
+</script>
+
+<!-- ===================== 导出用的 HTML 模板（样式 + 脚本） ===================== -->
+<script type="text/export-css" id="exportCSS">
+:root{--bg:#fff;--bg2:#fafafa;--fg:#0d0d0d;--fg2:#6e6e6e;--fg3:#a8a8a8;--line:#e6e6e6;--line2:#d4d4d4;--mk:#1a1a1a;--mkf:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0b0b;--bg2:#131313;--fg:#f2f2f2;--fg2:#9a9a9a;--fg3:#6a6a6a;--line:#242424;--line2:#333;--mk:#f2f2f2;--mkf:#0b0b0b}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.hd{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 24px;z-index:5}
+.ttl{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.sub{font-size:12px;color:var(--fg3);margin-top:2px;font-variant-numeric:tabular-nums}
+.ctl{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+select,input{font:13px/1 inherit;font-family:inherit;padding:7px 9px;border:1px solid var(--line2);border-radius:7px;background:var(--bg);color:var(--fg);outline:0}
+input{flex:1;min-width:160px;max-width:360px}
+select:focus,input:focus{border-color:var(--fg)}
+.cnt{font-size:12px;color:var(--fg3);font-variant-numeric:tabular-nums}
+main{max-width:820px;margin:0 auto;padding:8px 0 60px}
+.blk{contain:layout}
+.m{display:flex;gap:11px;padding:9px 24px;align-items:flex-start}
+.m:hover{background:var(--bg2)}
+.av{width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;border:1px solid var(--line2)}
+.a0{background:#171717;color:#fff;border-color:#171717}.a1{background:#3d3d3d;color:#fff;border-color:#3d3d3d}
+.a2{background:#6b6b6b;color:#fff;border-color:#6b6b6b}.a3{background:#949494;color:#fff;border-color:#949494}
+.a4{background:#c4c4c4;color:#141414;border-color:#c4c4c4}.a5{background:#e8e8e8;color:#141414;border-color:#dcdcdc}
+@media (prefers-color-scheme:dark){.a0{background:#f0f0f0;color:#111;border-color:#f0f0f0}.a1{background:#c9c9c9;color:#111;border-color:#c9c9c9}
+.a2{background:#9a9a9a;color:#111;border-color:#9a9a9a}.a3{background:#6a6a6a;color:#fff;border-color:#6a6a6a}
+.a4{background:#414141;color:#f0f0f0;border-color:#414141}.a5{background:#282828;color:#e0e0e0;border-color:#333}}
+.bd{min-width:0;flex:1}
+.hh{display:flex;gap:8px;align-items:baseline;margin-bottom:2px}
+.nm{font-size:13px;font-weight:600}
+.tm{font-size:11.5px;color:var(--fg3);font-variant-numeric:tabular-nums}
+.ix{font-size:11px;color:var(--fg3);font-family:ui-monospace,Menlo,Consolas,monospace;margin-left:auto}
+.tx{font-size:14px;line-height:1.62;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+mark{background:var(--mk);color:var(--mkf);border-radius:2px;padding:0 1px}
+.none{padding:40px 24px;text-align:center;color:var(--fg3);font-size:13px}
+</script>
+
+<script type="text/export-js" id="exportJS">
+(function () {
+  var D = JSON.parse(document.getElementById('D').textContent);
+  var names = D.names, s = D.s, m = D.m, t = D.t, idx = D.idx;
+  var N = m.length, BS = 200;
+  var list = document.getElementById('list'), qEl = document.getElementById('q'),
+      roleEl = document.getElementById('role'), cntEl = document.getElementById('cnt'),
+      subEl = document.getElementById('sub');
+  var view = [], role = -1, q = '', io = null;
+
+  var ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+  function esc(x) { return String(x).replace(/[&<>"]/g, function (c) { return ESC[c]; }); }
+  function hash(x) { var h = 0; for (var i = 0; i < x.length; i++) h = (h * 31 + x.charCodeAt(i)) | 0; return Math.abs(h); }
+  function pad(x) { return x < 10 ? '0' + x : '' + x; }
+  function fmt(ms) {
+    if (!ms) return '';
+    var d = new Date(ms);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function hl(x) {
+    if (!q) return esc(x);
+    var lx = x.toLowerCase(), lq = q.toLowerCase(), i = 0, p, out = '', c = 0;
+    while (c < 300 && (p = lx.indexOf(lq, i)) !== -1) {
+      out += esc(x.slice(i, p)) + '<mark>' + esc(x.slice(p, p + q.length)) + '</mark>';
+      i = p + q.length; c++;
+    }
+    return out + esc(x.slice(i));
+  }
+  function fnum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+  for (var i = 0; i < names.length; i++) {
+    var o = document.createElement('option');
+    o.value = i; o.textContent = names[i];
+    roleEl.appendChild(o);
+  }
+  var all = document.createElement('option');
+  all.value = -1; all.textContent = '全部角色';
+  roleEl.insertBefore(all, roleEl.firstChild);
+  roleEl.value = -1;
+  subEl.textContent = fnum(N) + ' 条消息 · ' + names.length + ' 位角色';
+
+  function rebuild() {
+    view = [];
+    var lq = q.toLowerCase();
+    for (var i = 0; i < N; i++) {
+      if (role >= 0 && s[i] !== role) continue;
+      if (lq && m[i].toLowerCase().indexOf(lq) === -1) continue;
+      view.push(i);
+    }
+    cntEl.textContent = fnum(view.length) + ' 条';
+    draw();
+  }
+
+  function estimate(a, b) {
+    var h = 0;
+    for (var i = a; i < b; i++) h += 36 + Math.ceil(m[view[i]].length / 42) * 23;
+    return h;
+  }
+
+  function draw() {
+    if (io) io.disconnect();
+    list.innerHTML = '';
+    if (!view.length) {
+      list.innerHTML = '<div class="none">没有匹配的消息</div>';
+      return;
+    }
+    io = new IntersectionObserver(function (es) {
+      for (var k = 0; k < es.length; k++) {
+        var el = es[k].target;
+        if (es[k].isIntersecting) fill(el);
+        else unfill(el);
+      }
+    }, { root: null, rootMargin: '1200px 0px' });
+    for (var i = 0; i < view.length; i += BS) {
+      var d = document.createElement('div');
+      d.className = 'blk';
+      d.dataset.a = i;
+      d.style.minHeight = estimate(i, Math.min(i + BS, view.length)) + 'px';
+      list.appendChild(d);
+      io.observe(d);
+    }
+  }
+
+  function fill(el) {
+    if (el.dataset.on === '1') return;
+    var a = +el.dataset.a, b = Math.min(a + BS, view.length), h = '';
+    for (var i = a; i < b; i++) {
+      var g = view[i], nm = names[s[g]] || '', lv = hash(nm) % 6;
+      var ch = nm.charAt(0) || '?';
+      h += '<div class="m"><div class="av a' + lv + '">' + esc(ch.toUpperCase()) + '</div><div class="bd"><div class="hh">' +
+        '<span class="nm">' + esc(nm) + '</span>' +
+        (t && t[g] ? '<span class="tm">' + fmt(t[g]) + '</span>' : '') +
+        (idx ? '<span class="ix">#' + idx[g] + '</span>' : '') +
+        '</div><div class="tx">' + hl(m[g]) + '</div></div></div>';
+    }
+    el.innerHTML = h;
+    el.dataset.on = '1';
+    el.style.minHeight = '';
+  }
+
+  function unfill(el) {
+    if (el.dataset.on !== '1') return;
+    el.style.minHeight = el.offsetHeight + 'px';
+    el.innerHTML = '';
+    el.dataset.on = '0';
+  }
+
+  var tmr = 0;
+  qEl.addEventListener('input', function () {
+    clearTimeout(tmr);
+    tmr = setTimeout(function () { q = qEl.value.trim(); rebuild(); }, 200);
+  });
+  roleEl.addEventListener('change', function () { role = +roleEl.value; rebuild(); });
+
+  rebuild();
+})();
+</script>
+
+</body>
+</html>
