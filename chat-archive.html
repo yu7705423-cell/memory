@@ -138,6 +138,10 @@ button, input, select, textarea { font-family: inherit; }
 }
 .seg button.on { background:var(--panel); color:var(--fg); font-weight:500; box-shadow:var(--shadow-1); }
 .seg .i { width:13px; height:13px; }
+.top-actions { display:flex; align-items:center; gap:6px; }
+.lbl { display:none; }
+.tag.more { cursor:pointer; border-style:dashed; color:var(--fg-3); }
+.tag.more:hover { color:var(--fg); border-color:var(--fg-3); }
 
 /* 路由 */
 #intro, #roster, #reader { display:none; min-height:0; }
@@ -276,7 +280,8 @@ button, input, select, textarea { font-family: inherit; }
 /* ============================================================
    阅读区
    ============================================================ */
-#reader { grid-template-columns:256px 1fr; min-height:0; }
+#reader { grid-template-columns:256px 1fr; min-height:0; position:relative; }
+.scrim { display:none; }
 #reader.with-detail { grid-template-columns:256px 1fr 336px; }
 
 .sidebar { border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0; background:var(--panel); }
@@ -511,16 +516,67 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
 
 @media (max-width:900px) {
   #reader, #reader.with-detail { grid-template-columns:1fr; }
-  .sidebar { position:absolute; inset:56px auto 0 0; width:250px; z-index:30; transform:translateX(-100%);
+  .sidebar { position:absolute; inset:0 auto 0 0; width:min(270px,82vw); z-index:30; transform:translateX(-100%);
     transition:transform .2s; box-shadow:var(--shadow-3); }
   .sidebar.open { transform:none; }
-  .detail { position:absolute; inset:56px 0 0 auto; width:min(340px,88vw); z-index:31; box-shadow:var(--shadow-3); }
+  .detail { position:absolute; inset:0 0 0 auto; width:min(340px,90vw); z-index:31; box-shadow:var(--shadow-3); }
+  .scrim { display:block; position:absolute; inset:0; z-index:29; background:rgba(8,10,14,.38);
+    opacity:0; pointer-events:none; transition:opacity .2s; }
+  #reader.drawer .scrim { opacity:1; pointer-events:auto; }
   .hide-sm { display:none !important; }
   .msg.chat .msg-body { max-width:86%; }
-  .roster-head { padding:18px 18px 13px; }
-  .roster-body { padding:16px 18px 40px; }
 }
 @media (min-width:901px) { .only-sm { display:none !important; } }
+
+/* ---------- 手机：顶栏拆两行，次要动作收进下拉 ---------- */
+@media (max-width:760px) {
+  .app { grid-template-rows:auto 1fr; }
+  .topbar { position:relative; flex-wrap:wrap; padding:8px 10px; gap:8px; }
+  .brand b { display:none; }
+  .brand .script { font-size:18px; color:var(--fg); }
+  .searchbox { order:10; flex:1 1 100%; width:auto; height:36px; }
+  .top-actions {
+    display:none; position:absolute; top:calc(100% - 2px); right:8px; z-index:50;
+    flex-direction:column; align-items:stretch; gap:2px; padding:6px; min-width:184px;
+    background:var(--panel); border:1px solid var(--line); border-radius:11px; box-shadow:var(--shadow-3);
+  }
+  .top-actions.open { display:flex; }
+  .top-actions .iconbtn { width:auto; height:38px; justify-content:flex-start; gap:11px; padding:0 10px; color:var(--fg); }
+  .top-actions .seg { width:100%; margin-bottom:2px; }
+  .top-actions .seg button { flex:1; justify-content:center; height:30px; font-size:12.5px; }
+  .lbl { display:inline; font-size:13.5px; }
+
+  .roster-head { padding:16px 16px 12px; }
+  .roster-title .script { font-size:27px; }
+  .roster-body { padding:16px 14px 40px; }
+  .folders { grid-template-columns:1fr; gap:20px; }
+  .folder { min-height:0; }
+  .folder-tools { opacity:1; transform:none; position:static; background:none; padding:2px 0 0; }
+
+  .mainbar { flex-wrap:wrap; padding:8px 12px; row-gap:8px; min-height:0; }
+  .mainbar .flex-1 { flex-basis:100%; height:0; }
+  .msg { padding:9px 12px; gap:9px; }
+  .msg.chat { padding:7px 10px; }
+  .msg-idx { display:none; }
+  .msg-tags { gap:4px; margin-top:4px; }
+  .tag { font-size:10.5px; padding:1px 5px; gap:4px; }
+  .tag k { font-size:9.5px; }
+  .tag v { max-width:150px; }
+  .msg-open { top:4px; right:2px; }
+  .avatar { width:30px; height:30px; font-size:12px; }
+  .avatar.lg { width:44px; height:44px; font-size:16px; }
+  .modal { border-radius:12px; max-height:92vh; }
+  .overlay { padding:12px; }
+  .modal-body { padding:14px; }
+  .grid-2 { grid-template-columns:1fr; }
+  .frow { grid-template-columns:84px 1fr; }
+  .classlist div { grid-template-columns:1fr; gap:2px; }
+  .detail-raw { max-height:220px; }
+}
+@media (max-width:400px) {
+  .seg button { padding:4px 7px; font-size:11.5px; }
+  .msg-text { font-size:14.5px; }
+}
 </style>
 </head>
 <body>
@@ -546,6 +602,8 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
   <symbol id="i-bubble" viewBox="0 0 24 24"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10Z"/></symbol>
   <symbol id="i-rows" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5 20v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9Z"/><circle cx="8" cy="8" r="1.3"/></symbol>
   <symbol id="i-expand" viewBox="0 0 24 24"><path d="M9 4H5a1 1 0 0 0-1 1v4M15 4h4a1 1 0 0 1 1 1v4M9 20H5a1 1 0 0 1-1-1v-4M15 20h4a1 1 0 0 0 1-1v-4"/></symbol>
 </defs></svg>
 
@@ -564,16 +622,18 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
 
     <div class="flex-1"></div>
 
-    <div class="seg hide-sm need-data" id="layoutSeg" title="消息排版">
-      <button data-layout="flat" class="on"><svg class="i"><use href="#i-rows"/></svg>平铺</button>
-      <button data-layout="chat"><svg class="i"><use href="#i-bubble"/></svg>对话体</button>
+    <div class="top-actions" id="topActions">
+      <div class="seg need-data" id="layoutSeg" title="消息排版">
+        <button data-layout="flat" class="on"><svg class="i"><use href="#i-rows"/></svg>平铺</button>
+        <button data-layout="chat"><svg class="i"><use href="#i-bubble"/></svg>对话体</button>
+      </div>
+      <button class="iconbtn need-data" id="btnRoster" title="档案室"><svg class="i i-lg"><use href="#i-folder"/></svg><span class="lbl">档案室</span></button>
+      <button class="iconbtn" id="btnImport" title="导入"><svg class="i i-lg"><use href="#i-upload"/></svg><span class="lbl">导入</span></button>
+      <button class="iconbtn need-data" id="btnExport" title="导出"><svg class="i i-lg"><use href="#i-download"/></svg><span class="lbl">导出</span></button>
+      <button class="iconbtn" id="btnCSS" title="自定义 CSS"><svg class="i i-lg"><use href="#i-code"/></svg><span class="lbl">自定义 CSS</span></button>
+      <button class="iconbtn" id="btnTheme" title="切换主题"><svg class="i i-lg"><use href="#i-theme"/></svg><span class="lbl">深色 / 浅色</span></button>
     </div>
-
-    <button class="iconbtn need-data" id="btnRoster" title="档案室"><svg class="i i-lg"><use href="#i-folder"/></svg></button>
-    <button class="iconbtn" id="btnImport" title="导入"><svg class="i i-lg"><use href="#i-upload"/></svg></button>
-    <button class="iconbtn need-data" id="btnExport" title="导出"><svg class="i i-lg"><use href="#i-download"/></svg></button>
-    <button class="iconbtn" id="btnCSS" title="自定义 CSS"><svg class="i i-lg"><use href="#i-code"/></svg></button>
-    <button class="iconbtn" id="btnTheme" title="切换主题"><svg class="i i-lg"><use href="#i-theme"/></svg></button>
+    <button class="iconbtn only-sm" id="btnMore" title="更多"><svg class="i i-lg"><use href="#i-more"/></svg></button>
   </header>
 
   <!-- ===== 首屏 ===== -->
@@ -641,7 +701,12 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
           <button class="iconbtn" id="hitPrev" title="上一条 (Shift+Enter)"><svg class="i"><use href="#i-up"/></svg></button>
           <button class="iconbtn" id="hitNext" title="下一条 (Enter)"><svg class="i"><use href="#i-down"/></svg></button>
         </div>
-        <div class="seg hide-sm" id="modeSeg" hidden>
+        <div class="seg" id="fieldSeg" hidden title="每条消息下方显示多少字段">
+          <button data-fm="all">全部字段</button>
+          <button data-fm="lite">精简</button>
+          <button data-fm="off">隐藏</button>
+        </div>
+        <div class="seg" id="modeSeg" hidden>
           <button data-mode="filter" class="on">仅匹配</button>
           <button data-mode="locate">全部+定位</button>
         </div>
@@ -657,6 +722,8 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
       </div>
       <div class="datechip" id="dateChip"></div>
     </main>
+
+    <div class="scrim" id="scrim"></div>
 
     <aside class="detail" id="detail" hidden>
       <div class="detail-head">
@@ -705,14 +772,13 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
     <div id="mapRows"></div>
 
     <div class="field" style="margin-top:17px">
-      <label class="label">随消息显示的附加字段 <span style="color:var(--fg-4)">（勾几个就在每条下面显示几个标签）</span></label>
-      <div class="picklist" id="inlinePick"></div>
-      <div class="help" id="inlineHint"></div>
+      <div class="note"><svg class="i"><use href="#i-tag"/></svg>
+        <span id="fieldsNote">除上面三个字段外，JSON 里剩下的字段会<b>全部保留</b>，直接显示在每条消息下方，详情面板里还能看到完整原始 JSON。不用挑。</span></div>
     </div>
 
     <div class="field">
       <label class="check"><input type="checkbox" id="optRaw" checked>
-        <span>保留完整原始字段<span class="check-sub" id="rawHint">点任意消息可在右侧看到它的全部字段，几十个字段也能完整还原</span></span></label>
+        <span>保留全部字段<span class="check-sub" id="rawHint">关掉就只留消息 / 发送者 / 时间三项，省内存</span></span></label>
       <label class="check"><input type="checkbox" id="optSort">
         <span>按时间升序排序<span class="check-sub">原始顺序不是时间顺序时勾选</span></span></label>
       <label class="check"><input type="checkbox" id="optCache" checked>
@@ -740,6 +806,7 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
     <div class="field">
       <label class="check"><input type="checkbox" id="expTime" checked><span>包含时间戳</span></label>
       <label class="check"><input type="checkbox" id="expIndex"><span>包含原始序号</span></label>
+      <label class="check"><input type="checkbox" id="expFields" checked><span>包含全部字段（作为标签）</span></label>
       <label class="check"><input type="checkbox" id="expAvatar" checked><span>内嵌头像</span></label>
       <label class="check"><input type="checkbox" id="expCSS" checked><span>带上我的自定义 CSS 和当前排版</span></label>
     </div>
@@ -799,6 +866,7 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
 'use strict';
 
 var RAW = null;
+var PATHS = [];
 var CH = [];
 var MSG_CHUNK = 20000;
 var CHAR_CHUNK = 8e6;
@@ -883,8 +951,12 @@ function detect(paths, rows) {
     for (var i = 0; i < paths.length; i++) {
       var p = paths[i], leaf = p.split('.').pop().toLowerCase(), score = -1;
       for (var j = 0; j < kws.length; j++) {
-        if (leaf === kws[j]) { score = Math.max(score, 100 - j); break; }
-        if (leaf.indexOf(kws[j]) !== -1) score = Math.max(score, 50 - j);
+        var kw = kws[j];
+        if (leaf === kw) { score = Math.max(score, 100 - j); break; }
+        // 词首 / 词尾命中比夹在中间可信（created_at 该赢过 updated_at 里那个 "date"）
+        if (leaf.indexOf(kw) === 0 || leaf.lastIndexOf(kw) === leaf.length - kw.length)
+          score = Math.max(score, 70 - j);
+        else if (leaf.indexOf(kw) !== -1) score = Math.max(score, 50 - j);
       }
       if (score < 0) continue;
       var sample = rows.length ? getPath(rows[0], p) : null;
@@ -967,6 +1039,7 @@ function doParse(text) {
   var paths = [], step = Math.max(1, Math.floor(n / 300));
   for (var s = 0; s < n && paths.length < 300; s += step) collectPaths(rows[s], '', paths, 1);
 
+  PATHS = paths;
   post({ type: 'parsed', count: n, paths: paths, chars: text.length,
          samples: rows.slice(0, 3), detected: detect(paths, rows.slice(0, 50)) });
 }
@@ -977,9 +1050,6 @@ function doNormalize(opt) {
   var times = new Float64Array(n);
   var senderIdx = new Int32Array(n);
   var senderMap = Object.create(null), senders = [];
-  var inlinePaths = opt.inlinePaths || [];
-  var inline = [];
-  for (i = 0; i < inlinePaths.length; i++) inline.push(new Array(n));
   var rawJson = opt.keepRaw ? new Array(n) : null;
 
   for (i = 0; i < n; i++) {
@@ -994,7 +1064,6 @@ function doNormalize(opt) {
       senders.push({ name: sname, count: 0, first: NaN, last: NaN });
     }
     senderIdx[i] = si;
-    for (var p = 0; p < inlinePaths.length; p++) inline[p][i] = toText(getPath(row, inlinePaths[p]));
     if (rawJson) { try { rawJson[i] = JSON.stringify(row); } catch (e) { rawJson[i] = '{}'; } }
     if ((i & 16383) === 0) progress('normalize', i / n * 55, '归一化');
   }
@@ -1010,15 +1079,13 @@ function doNormalize(opt) {
       return ta === tb ? a - b : ta - tb;
     });
     var t2 = new Array(n), tm2 = new Float64Array(n), si2 = new Int32Array(n);
-    var in2 = [], rj2 = rawJson ? new Array(n) : null;
-    for (p = 0; p < inline.length; p++) in2.push(new Array(n));
+    var rj2 = rawJson ? new Array(n) : null;
     for (i = 0; i < n; i++) {
       var o = order[i];
       t2[i] = texts[o]; tm2[i] = times[o]; si2[i] = senderIdx[o];
-      for (p = 0; p < inline.length; p++) in2[p][i] = inline[p][o];
       if (rj2) rj2[i] = rawJson[o];
     }
-    texts = t2; times = tm2; senderIdx = si2; inline = in2; rawJson = rj2;
+    texts = t2; times = tm2; senderIdx = si2; rawJson = rj2;
     progress('normalize', 62, '按时间排序');
   }
 
@@ -1038,8 +1105,12 @@ function doNormalize(opt) {
   buildIndex(texts);
   RAW = null;
 
+  var mapped = [mapping.message, mapping.sender, mapping.timestamp];
+  var fieldPaths = [];
+  for (i = 0; i < PATHS.length; i++) if (mapped.indexOf(PATHS[i]) === -1) fieldPaths.push(PATHS[i]);
+
   post({ type: 'normalized', texts: texts, times: times.buffer, senderIdx: senderIdx.buffer,
-         senders: senders, inlinePaths: inlinePaths, inline: inline, rawJson: rawJson },
+         senders: senders, fieldPaths: fieldPaths, rawJson: rawJson },
        [times.buffer, senderIdx.buffer]);
 }
 
@@ -1116,7 +1187,7 @@ const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll
 
 const S = {
   texts: [], times: new Float64Array(0), senderIdx: new Int32Array(0), senders: [],
-  inlinePaths: [], inline: [], rawJson: null, mapping: {},
+  fieldPaths: [], rawJson: null, mapping: {}, fieldMode: 'all', avgFields: 0,
   view: new Int32Array(0), sender: -1, query: '', mode: 'filter',
   hits: null, navHits: null, hitPos: -1,
   expanded: new Set(), heights: new Map(), avgCharW: 12,
@@ -1360,6 +1431,41 @@ function avatarHTML(name, cls) {
   return '<span class="avatar ' + g + ' ' + (cls || '') + '">' + esc(initial(name)) + '</span>';
 }
 
+/* ---------------- 字段：JSON 里的东西全都在，按需解析 ---------------- */
+const fieldCache = new Map();
+function fieldsOf(gi, nocache) {
+  if (!S.rawJson) return [];
+  if (!nocache) { const c = fieldCache.get(gi); if (c) return c; }
+  let obj = null;
+  try { obj = JSON.parse(S.rawJson[gi]); } catch (e) {}
+  const rows = [];
+  if (obj) flatten(obj, '', rows, 1);
+  const skip = [S.mapping.message, S.mapping.sender, S.mapping.timestamp];
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const k = rows[i][0], v = rows[i][1];
+    if (skip.indexOf(k) !== -1) continue;
+    if (v == null || v === '' || (Array.isArray(v) && !v.length)) continue;
+    let sv;
+    if (typeof v === 'object') { try { sv = JSON.stringify(v); } catch (e) { sv = String(v); } }
+    else sv = String(v);
+    if (sv === '{}' || sv === '[]') continue;
+    out.push([k.split('.').pop(), sv, k]);
+  }
+  if (!nocache) {
+    if (fieldCache.size > 4000) fieldCache.clear();
+    fieldCache.set(gi, out);
+  }
+  return out;
+}
+function computeAvgFields() {
+  if (!S.rawJson) { S.avgFields = 0; return; }
+  const n = S.texts.length, step = Math.max(1, Math.floor(n / 40));
+  let total = 0, cnt = 0;
+  for (let i = 0; i < n; i += step) { total += fieldsOf(i, true).length; cnt++; }
+  S.avgFields = cnt ? Math.round(total / cnt) : 0;
+}
+
 /* ---------------- 行渲染 ---------------- */
 const CLAMP_AT = 1400;
 const viewport = $('#viewport'), spacer = $('#spacer');
@@ -1381,20 +1487,27 @@ function estimate(vi) {
   const clamp = len > CLAMP_AT && !S.expanded.has(gi);
   if (clamp) lines = 6;
   let h = (S.layout === 'chat' ? 14 + 20 + 18 : 18 + 18) + lines * 22.9 + (clamp ? 22 : 0);
-  if (S.inlinePaths.length) h += 24;
+  if (S.rawJson && S.fieldMode !== 'off' && S.avgFields) {
+    const shown = S.fieldMode === 'lite' ? Math.min(liteN(), S.avgFields) : S.avgFields;
+    const perLine = Math.max(1, Math.floor(rowWidth() / 118));
+    h += Math.ceil(shown / perLine) * 24 + 3;
+  }
   return h;
 }
 
+function liteN() { return window.innerWidth < 760 ? 3 : 6; }
 function tagsHTML(gi) {
-  if (!S.inlinePaths.length) return '';
+  if (S.fieldMode === 'off' || !S.rawJson) return '';
+  const f = fieldsOf(gi);
+  if (!f.length) return '';
+  const lim = S.fieldMode === 'lite' ? Math.min(liteN(), f.length) : f.length;
   let out = '';
-  for (let p = 0; p < S.inlinePaths.length; p++) {
-    const v = S.inline[p] ? S.inline[p][gi] : '';
-    if (!v) continue;
-    const short = v.length > 60 ? v.slice(0, 60) + '…' : v;
-    out += '<span class="tag"><k>' + esc(S.inlinePaths[p].split('.').pop()) + '</k><v>' + esc(short) + '</v></span>';
+  for (let i = 0; i < lim; i++) {
+    const v = f[i][1];
+    out += '<span class="tag"><k>' + esc(f[i][0]) + '</k><v>' + esc(v.length > 60 ? v.slice(0, 60) + '…' : v) + '</v></span>';
   }
-  return out ? '<div class="msg-tags">' + out + '</div>' : '';
+  if (f.length > lim) out += '<span class="tag more">+' + (f.length - lim) + ' 个字段</span>';
+  return '<div class="msg-tags">' + out + '</div>';
 }
 
 function renderRow(vi) {
@@ -1442,7 +1555,7 @@ spacer.addEventListener('click', e => {
     S.expanded.add(gi); S.heights.delete(gi); vlist.invalidate(vi);
     return;
   }
-  if (e.target.closest('.msg-open')) openDetail(gi);
+  if (e.target.closest('.msg-open') || e.target.closest('.tag.more')) openDetail(gi);
 });
 
 let dateTimer = 0;
@@ -1624,13 +1737,9 @@ function openDetail(gi) {
       html += '<div class="detail-sec">Raw JSON</div><div class="detail-raw">' +
         esc(JSON.stringify(obj, null, 2).slice(0, 20000)) + '</div>';
     }
-  } else if (S.inlinePaths.length) {
-    html += '<div class="detail-sec">Extra fields</div>';
-    S.inlinePaths.forEach((p, i) => {
-      html += '<div class="frow"><div class="fkey">' + esc(p) + '</div>' + valHTML(S.inline[i][gi]) + '</div>';
-    });
   } else {
-    html += '<div class="detail-sec">Extra fields</div><div class="help">导入时没有勾选「保留完整原始字段」，重新导入即可看到全部字段。</div>';
+    html += '<div class="detail-sec">Extra fields</div>' +
+      '<div class="help">导入时关掉了「保留全部字段」，所以这里只有映射过的三项。重新导入并勾上即可看到全部字段。</div>';
   }
   $('#detailBody').innerHTML = html;
   $('#detailBody').scrollTop = 0;
@@ -1798,10 +1907,39 @@ function renderRoles() {
 function selectSender(i) {
   S.sender = i;
   rebuildView(); renderRoles();
-  $('#sidebar').classList.remove('open');
+  toggleSidebar(false);
 }
 $('#roleFilter').addEventListener('input', renderRoles);
-$('#btnSide').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+function toggleSidebar(on) {
+  const open = on === undefined ? !$('#sidebar').classList.contains('open') : on;
+  $('#sidebar').classList.toggle('open', open);
+  $('#reader').classList.toggle('drawer', open);
+}
+$('#btnSide').addEventListener('click', () => toggleSidebar());
+$('#scrim').addEventListener('click', () => toggleSidebar(false));
+$('#btnMore').addEventListener('click', e => { e.stopPropagation(); $('#topActions').classList.toggle('open'); });
+document.addEventListener('click', e => {
+  const ta = $('#topActions');
+  if (!ta.classList.contains('open')) return;
+  if (e.target.closest('#topActions') && !e.target.closest('button')) return;
+  if (e.target.closest('#btnMore')) return;
+  ta.classList.remove('open');
+});
+
+/* ---------------- 字段密度 ---------------- */
+$$('#fieldSeg button').forEach(b => b.addEventListener('click', () => {
+  $$('#fieldSeg button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  S.fieldMode = b.dataset.fm;
+  try { localStorage.setItem('ca-fields', S.fieldMode); } catch (e) {}
+  S.heights.clear();
+  vlist.remeasureAll();
+}));
+function syncFieldSeg() {
+  const on = !!(S.rawJson && S.texts.length);
+  $('#fieldSeg').hidden = !on;
+  $$('#fieldSeg button').forEach(b => b.classList.toggle('on', b.dataset.fm === S.fieldMode));
+}
 
 /* ---------------- 排版切换 ---------------- */
 $$('#layoutSeg button').forEach(b => b.addEventListener('click', () => {
@@ -1927,29 +2065,24 @@ function buildMapUI(d) {
   $('#mapRows').innerHTML = html;
   $('#mapMsg').textContent = '';
 
-  const used = () => [$('#map_message').value, $('#map_sender').value, $('#map_timestamp').value];
-  const drawPick = () => {
-    const u = used();
-    $('#inlinePick').innerHTML = d.paths.filter(p => u.indexOf(p) === -1).map(p =>
-      '<label><input type="checkbox" value="' + esc(p) + '"><span>' + esc(p) + '</span></label>').join('') ||
-      '<div class="help" style="padding:6px">没有其他字段</div>';
+  const noteEl = $('#fieldsNote');
+  const drawNote = () => {
+    const u = [$('#map_message').value, $('#map_sender').value, $('#map_timestamp').value];
+    const rest = d.paths.filter(p => u.indexOf(p) === -1);
+    noteEl.innerHTML = '除上面映射的字段外，JSON 里剩下的 <b>' + rest.length +
+      ' 个字段全部保留</b>，直接显示在每条消息下方；详情面板里还能看到完整原始 JSON。不用挑。' +
+      (rest.length ? '<br><span style="color:var(--fg-4);font-family:var(--mono);font-size:11px">' +
+        esc(rest.slice(0, 14).join('  ')) + (rest.length > 14 ? '  …' : '') + '</span>' : '');
   };
-  drawPick();
-  $$('#mapRows select').forEach(s => s.addEventListener('change', drawPick));
-  $('#inlinePick').addEventListener('change', e => {
-    const on = $$('#inlinePick input:checked');
-    if (on.length > 8) { e.target.checked = false; toast('最多勾 8 个'); return; }
-    $$('#inlinePick label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
-    $('#inlineHint').textContent = on.length ? '已选 ' + on.length + ' 个，会显示在每条消息下方' : '不选也可以，全部字段仍能在详情面板里看到';
-  });
-  $('#inlineHint').textContent = '不选也可以，全部字段仍能在详情面板里看到';
+  drawNote();
+  $$('#mapRows select').forEach(s => s.addEventListener('change', drawNote));
 
   const mb = Math.round(d.chars * 2 / 1048576);
   const heavy = d.chars > 6e7;
   $('#optRaw').checked = !heavy;
   $('#rawHint').textContent = heavy
-    ? '这份数据约 ' + mb + ' MB，保留全部字段会明显吃内存，默认已关闭'
-    : '点消息右上角可查看它的全部字段，几十个字段也能完整还原（约 ' + mb + ' MB 内存）';
+    ? '这份数据约 ' + mb + ' MB，全字段会明显吃内存，默认已关闭；勾上也能用，只是更占内存'
+    : '关掉就只留消息 / 发送者 / 时间三项，省约 ' + mb + ' MB 内存';
 
   let sample = '';
   try { sample = JSON.stringify(d.samples[0], null, 2); } catch (e) { sample = '(无法显示)'; }
@@ -1964,10 +2097,9 @@ $('#btnMapGo').addEventListener('click', () => {
   };
   if (!mapping.message) { $('#mapMsg').textContent = '必须选择消息内容字段'; return; }
   S.mapping = mapping;
-  const inlinePaths = $$('#inlinePick input:checked').map(i => i.value);
   closeModal('#mapModal');
   showLoading('建立档案', '归一化', 0);
-  wpost({ type: 'normalize', mapping, inlinePaths, keepRaw: $('#optRaw').checked, sortByTime: $('#optSort').checked });
+  wpost({ type: 'normalize', mapping, keepRaw: $('#optRaw').checked, sortByTime: $('#optSort').checked });
 });
 
 function computeAvgCharW() {
@@ -1987,18 +2119,22 @@ function applyNormalized(d) {
   S.times = new Float64Array(d.times);
   S.senderIdx = new Int32Array(d.senderIdx);
   S.senders = d.senders;
-  S.inlinePaths = d.inlinePaths || [];
-  S.inline = d.inline || [];
+  S.fieldPaths = d.fieldPaths || [];
   S.rawJson = d.rawJson || null;
+  fieldCache.clear();
   S.expanded.clear(); S.heights.clear();
   S.hits = null; S.navHits = null; S.hitPos = -1; S.sender = -1;
   S.query = ''; qInput.value = ''; $('#qClear').hidden = true;
   if (S.selfName && !S.senders.some(s => s.name === S.selfName)) S.selfName = '';
   computeAvgCharW();
+  computeAvgFields();
+  if (S.avgFields > 10 && S.fieldMode === 'all') S.fieldMode = 'lite';
+  syncFieldSeg();
   renderRoles(); renderRoster(); rebuildView();
   goRoute('roster');
   hideLoading();
-  toast('档案已建立 · ' + num(S.texts.length) + ' 条 · ' + num(S.senders.length) + ' 位角色');
+  toast('档案已建立 · ' + num(S.texts.length) + ' 条 · ' + num(S.senders.length) + ' 位角色' +
+        (S.avgFields ? ' · 每条 ' + S.avgFields + ' 个附加字段' : ''));
   if ($('#optCache').checked) saveCache(); else updateCacheInfo(null);
 }
 
@@ -2059,8 +2195,9 @@ async function saveCache() {
     if (S.rawJson) for (let i = 0; i < n; i += 97) rawChars += S.rawJson[i].length * 97;
     const keepRaw = !!S.rawJson && rawChars < RAW_CACHE_LIMIT;
     const meta = {
-      count: n, chunks, senders: S.senders, mapping: S.mapping, inlinePaths: S.inlinePaths,
-      hasRaw: keepRaw, fileName: S.fileName, savedAt: Date.now(), avgCharW: S.avgCharW
+      count: n, chunks, senders: S.senders, mapping: S.mapping, fieldPaths: S.fieldPaths,
+      hasRaw: keepRaw, fileName: S.fileName, savedAt: Date.now(),
+      avgCharW: S.avgCharW, avgFields: S.avgFields
     };
     await runTx(db, 'readwrite', st => {
       clearDataKeys(st);
@@ -2068,8 +2205,6 @@ async function saveCache() {
       st.put({ times: S.times, senderIdx: S.senderIdx }, 'cols');
       for (let c = 0; c < chunks; c++) {
         st.put(S.texts.slice(c * TXT_CHUNK, (c + 1) * TXT_CHUNK), 'txt:' + c);
-        for (let p = 0; p < S.inlinePaths.length; p++)
-          st.put(S.inline[p].slice(c * TXT_CHUNK, (c + 1) * TXT_CHUNK), 'inl:' + p + ':' + c);
         if (keepRaw) st.put(S.rawJson.slice(c * TXT_CHUNK, (c + 1) * TXT_CHUNK), 'raw:' + c);
       }
     });
@@ -2083,13 +2218,12 @@ async function loadCache() {
   if (!m || !m.count) return null;
   const res = await runTx(db, 'readonly', st => {
     const cols = reqP(st.get('cols'));
-    const txt = [], inl = (m.inlinePaths || []).map(() => []), raw = [];
+    const txt = [], raw = [];
     for (let c = 0; c < m.chunks; c++) {
       txt.push(reqP(st.get('txt:' + c)));
-      for (let p = 0; p < (m.inlinePaths || []).length; p++) inl[p].push(reqP(st.get('inl:' + p + ':' + c)));
       if (m.hasRaw) raw.push(reqP(st.get('raw:' + c)));
     }
-    return { cols, txt, inl, raw };
+    return { cols, txt, raw };
   });
   const cols = await res.cols;
   const join = async parts => {
@@ -2100,10 +2234,8 @@ async function loadCache() {
   };
   const texts = await join(res.txt);
   if (!cols || texts.length !== m.count) return null;
-  const inline = [];
-  for (const p of res.inl) inline.push(await join(p));
   const rawJson = m.hasRaw ? await join(res.raw) : null;
-  return { meta: m, texts, inline, rawJson, times: cols.times, senderIdx: cols.senderIdx };
+  return { meta: m, texts, rawJson, times: cols.times, senderIdx: cols.senderIdx };
 }
 
 function updateCacheInfo(meta) {
@@ -2202,9 +2334,9 @@ $('#expMD').addEventListener('click', () => {
     if (showTime && isFinite(S.times[g])) head += ' · *' + fmtTime(S.times[g]) + '*';
     if (showIdx) head += ' · `#' + (g + 1) + '`';
     out.push(head + '  ', S.texts[g], '');
-    if (S.inlinePaths.length) {
-      const tags = S.inlinePaths.map((p, k) => S.inline[k][g] ? p.split('.').pop() + ': ' + S.inline[k][g] : '').filter(Boolean);
-      if (tags.length) out.push('<sub>' + tags.join(' · ') + '</sub>', '');
+    if (S.rawJson) {
+      const f = fieldsOf(g, true);
+      if (f.length) out.push('<sub>' + f.map(x => x[0] + ': ' + x[1]).join(' · ') + '</sub>', '');
     }
   }
   download(out.join('\n'), 'chat-' + stamp() + '.md', 'text/markdown');
@@ -2233,7 +2365,6 @@ $('#expJSON').addEventListener('click', () => {
     const o = { sender: S.senders[S.senderIdx[g]].name, message: S.texts[g] };
     if (showTime) o.timestamp = isFinite(S.times[g]) ? new Date(S.times[g]).toISOString() : null;
     if (showIdx) o.index = g + 1;
-    S.inlinePaths.forEach((p, k) => { o[p] = S.inline[k][g]; });
     arr[i] = o;
   }
   download(JSON.stringify(arr, null, 1), 'chat-' + stamp() + '.json', 'application/json');
@@ -2249,7 +2380,6 @@ $('#expHTML').addEventListener('click', () => {
   const s = new Array(v.length), m = new Array(v.length);
   const t = showTime ? new Array(v.length) : null;
   const idx = showIdx ? new Array(v.length) : null;
-  const tags = S.inlinePaths.map(() => new Array(v.length));
   for (let i = 0; i < v.length; i++) {
     const g = v[i], si = S.senderIdx[g];
     let r = remap.get(si);
@@ -2257,7 +2387,26 @@ $('#expHTML').addEventListener('click', () => {
     s[i] = r; m[i] = S.texts[g];
     if (t) t[i] = isFinite(S.times[g]) ? S.times[g] : null;
     if (idx) idx[i] = g + 1;
-    for (let p = 0; p < tags.length; p++) tags[p][i] = S.inline[p][g] || '';
+  }
+
+  // 全字段：从保留的原始记录里取，最多 40 个字段
+  let tagKeys = [], tags = [];
+  if ($('#expFields').checked && S.rawJson) {
+    if (v.length > 120000) toast('条数太多，导出时省略了字段标签');
+    else {
+      const short = new Map();
+      const step = Math.max(1, Math.floor(v.length / 400));
+      for (let i = 0; i < v.length; i += step)
+        for (const f of fieldsOf(v[i], true)) if (!short.has(f[2])) short.set(f[2], f[0]);
+      const paths = Array.from(short.keys()).slice(0, 40);
+      tagKeys = paths.map(k => short.get(k));
+      tags = paths.map(() => new Array(v.length));
+      for (let i = 0; i < v.length; i++) {
+        const map = new Map();
+        for (const f of fieldsOf(v[i], true)) map.set(f[2], f[1]);
+        for (let p = 0; p < paths.length; p++) tags[p][i] = map.get(paths[p]) || '';
+      }
+    }
   }
   const av = {};
   if (withAv) used.forEach(n => { if (S.avatars.has(n)) av[n] = S.avatars.get(n); });
@@ -2265,7 +2414,7 @@ $('#expHTML').addEventListener('click', () => {
   const title = S.sender < 0 ? '聊天记录' : S.senders[S.sender].name;
   const payload = {
     title, names: used, s, m, t, idx, av,
-    tagKeys: S.inlinePaths.map(p => p.split('.').pop()), tags,
+    tagKeys, tags,
     layout: withCSS ? S.layout : 'flat',
     self: withCSS ? S.selfName : '',
     css: withCSS ? ($('#userCSS').textContent || '') : ''
@@ -2295,6 +2444,7 @@ $('#expHTML').addEventListener('click', () => {
   try {
     S.layout = localStorage.getItem('ca-layout') || 'flat';
     S.selfName = localStorage.getItem('ca-self') || '';
+    S.fieldMode = localStorage.getItem('ca-fields') || 'all';
   } catch (e) {}
   $$('#layoutSeg button').forEach(b => b.classList.toggle('on', b.dataset.layout === S.layout));
 
@@ -2310,12 +2460,16 @@ $('#expHTML').addEventListener('click', () => {
     S.times = c.times instanceof Float64Array ? c.times : new Float64Array(c.times);
     S.senderIdx = c.senderIdx instanceof Int32Array ? c.senderIdx : new Int32Array(c.senderIdx);
     S.senders = c.meta.senders;
-    S.inlinePaths = c.meta.inlinePaths || [];
-    S.inline = c.inline || [];
-    S.rawJson = c.rawJson;
+    S.fieldPaths = c.meta.fieldPaths || [];
+    S.rawJson = c.rawJson || null;
+    fieldCache.clear();
     S.mapping = c.meta.mapping || {};
     S.fileName = c.meta.fileName || '';
     S.avgCharW = c.meta.avgCharW || 12;
+    S.avgFields = c.meta.avgFields || 0;
+    if (!S.avgFields && S.rawJson) computeAvgFields();
+    if (S.avgFields > 10 && S.fieldMode === 'all') S.fieldMode = 'lite';
+    syncFieldSeg();
     if (S.selfName && !S.senders.some(x => x.name === S.selfName)) S.selfName = '';
     renderRoles(); renderRoster(); rebuildView();
     goRoute('roster');
