@@ -238,6 +238,11 @@ button, input, select, textarea { font-family:inherit; }
 }
 .msg.chat.self .msg-img { margin-left:auto; }
 .img-broken { display:inline-block; font-size:12px; color:var(--fg-4); border:1px dashed var(--line-2); border-radius:6px; padding:2px 7px; margin:3px 0; }
+.linkbox { display:inline; }
+.linkbox.ok > .msg-link { display:none; }
+.msg-link { color:var(--fg-2); text-decoration:underline; text-underline-offset:2px; word-break:break-all; }
+.msg-link:hover { color:var(--fg); }
+.msg.chat.self .msg-link { color:var(--panel); opacity:.85; }
 .msg-text.clamped { max-height:8.4em; overflow:hidden;
   -webkit-mask-image:linear-gradient(180deg,#000 66%,transparent); mask-image:linear-gradient(180deg,#000 66%,transparent); }
 .msg-more { margin-top:4px; font-size:11.5px; color:var(--fg-2); background:none; border:0; padding:0;
@@ -912,6 +917,33 @@ function toText(v) {
   try { return JSON.stringify(v); } catch (e) { return String(v); }
 }
 
+/* 图片地址可能压根不在消息字段里，而在同级的 image / pic / attachments…
+   所以整条记录扫一遍，把像图片的地址补进正文（去重），渲染层再还原成 <img>。*/
+var IMG_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|apng|avif)(\?|#|$)/i;
+var IMG_KEY_RE = /(image|img|pic|photo|sticker|emoji|thumb|cover|media|attach|file|url|src)/i;
+function looksImage(key, val) {
+  if (typeof val !== 'string' || val.length > 4000) return false;
+  if (/^data:image\//i.test(val)) return true;
+  if (!/^https?:\/\//i.test(val)) return false;
+  if (IMG_EXT_RE.test(val)) return true;
+  return IMG_KEY_RE.test(key || '');
+}
+function collectImages(obj, out, depth) {
+  if (!obj || typeof obj !== 'object' || depth > 3 || out.length > 8) return;
+  var keys = Object.keys(obj);
+  for (var i = 0; i < keys.length && out.length <= 8; i++) {
+    var k = keys[i], v = obj[k];
+    if (typeof v === 'string') {
+      if (looksImage(k, v) && out.indexOf(v) === -1) out.push(v);
+    } else if (Array.isArray(v)) {
+      for (var j = 0; j < v.length && out.length <= 8; j++) {
+        if (typeof v[j] === 'string') { if (looksImage(k, v[j]) && out.indexOf(v[j]) === -1) out.push(v[j]); }
+        else collectImages(v[j], out, depth + 1);
+      }
+    } else if (v && typeof v === 'object') collectImages(v, out, depth + 1);
+  }
+}
+
 function parseTime(v) {
   if (v == null || v === '') return NaN;
   var n;
@@ -1047,7 +1079,13 @@ function doNormalize(opt) {
 
   for (i = 0; i < n; i++) {
     var row = RAW[i];
-    texts[i] = toText(getPath(row, mapping.message));
+    var body = toText(getPath(row, mapping.message));
+    var imgs = [];
+    collectImages(row, imgs, 1);
+    for (var q = 0; q < imgs.length; q++) {
+      if (body.indexOf(imgs[q]) === -1) body += (body ? '\n' : '') + '![](' + imgs[q] + ')';
+    }
+    texts[i] = body;
     times[i] = mapping.timestamp ? parseTime(getPath(row, mapping.timestamp)) : NaN;
     var sname = mapping.sender ? toText(getPath(row, mapping.sender)).trim() : '';
     if (!sname) sname = '未署名';
@@ -1203,21 +1241,39 @@ function hl(text, q) {
 }
 /* 消息里可能夹着图片：markdown 图片、<img src>、data URI、以及看起来像图片的直链。
    一律先转义，再只把认得出的、协议安全的地址还原成 <img>，绝不注入任意 HTML。 */
-const MEDIA_RE = /!\[[^\]]*\]\(\s*([^)\s]+)\s*\)|<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["'][^>]*>|(data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+)|(https?:\/\/[^\s<>"']+?\.(?:png|jpe?g|gif|webp|bmp|svg|apng)(?:\?[^\s<>"']*)?)/gi;
+const MEDIA_RE = /!\[[^\]]*\]\(\s*([^)\s]+)\s*\)|<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["'][^>]*>|(data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+)|(https?:\/\/[^\s<>"'\u3000\uff0c\u3002\uff01\uff1f]+)/gi;
 function safeSrc(u) {
-  u = String(u || '').trim().replace(/&amp;/g, '&');
+  u = String(u || '').trim().replace(/&amp;/g, '&').replace(/[\u3002\uff0c\uff09)\]\u3011.,;]+$/, '');
   return /^(https?:\/\/|data:image\/)/i.test(u) ? u : '';
 }
+function imgTag(src, probe) {
+  return '<img class="msg-img' + (probe ? ' probe' : '') + '" src="' + esc(src) +
+         '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">';
+}
+/* 明确写成图片的（markdown / <img> / data URI / 带图片扩展名）直接当图片；
+   其余普通链接先当链接显示，同时偷偷试着加载一次 —— 能加载出来就换成图片，
+   加载不出来就还是链接。图床地址大多没有扩展名，靠猜是猜不准的。 */
+function mayHaveMedia(t) {
+  return t.indexOf('http') !== -1 || t.indexOf('![') !== -1 || t.indexOf('<img') !== -1 || t.indexOf('data:image') !== -1;
+}
 function richText(text, q) {
+  if (!mayHaveMedia(text)) return hl(text, q);
   MEDIA_RE.lastIndex = 0;
   if (!MEDIA_RE.test(text)) return hl(text, q);
   MEDIA_RE.lastIndex = 0;
   let out = '', last = 0, m;
   while ((m = MEDIA_RE.exec(text)) !== null) {
+    const explicit = !!(m[1] || m[2] || m[3]);
     const src = safeSrc(m[1] || m[2] || m[3] || m[4]);
     if (!src) continue;
     out += hl(text.slice(last, m.index), q);
-    out += '<img class="msg-img" src="' + esc(src) + '" alt="" loading="lazy" decoding="async">';
+    const known = explicit || /\.(png|jpe?g|gif|webp|bmp|svg|apng|avif)(\?|#|$)/i.test(src);
+    if (known) {
+      out += imgTag(src, false);
+    } else {
+      out += '<span class="linkbox"><a class="msg-link" href="' + esc(src) +
+             '" target="_blank" rel="noopener noreferrer">' + esc(src) + '</a>' + imgTag(src, true) + '</span>';
+    }
     last = m.index + m[0].length;
   }
   return out + hl(text.slice(last), q);
@@ -1609,14 +1665,19 @@ function renderRow(vi) {
 }
 
 const vlist = new VList(viewport, spacer, renderRow);
-spacer.addEventListener('load', e => {            // 图片加载完高度才定下来
-  if (e.target && e.target.classList && e.target.classList.contains('msg-img')) vlist.schedule();
+spacer.addEventListener('load', e => {
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains('msg-img')) return;
+  const box = el.closest('.linkbox');
+  if (box) box.classList.add('ok');      // 试出来是图片，把链接文字收起来
+  vlist.schedule();
 }, true);
 spacer.addEventListener('error', e => {
-  if (e.target && e.target.classList && e.target.classList.contains('msg-img')) {
-    e.target.replaceWith(Object.assign(document.createElement('span'), { className: 'img-broken', textContent: '[图片打不开]' }));
-    vlist.schedule();
-  }
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains('msg-img')) return;
+  if (el.classList.contains('probe')) el.remove();   // 只是试一下，不是图片就安静退回链接
+  else el.replaceWith(Object.assign(document.createElement('span'), { className: 'img-broken', textContent: '[图片打不开]' }));
+  vlist.schedule();
 }, true);
 
 spacer.addEventListener('click', e => {
@@ -2721,6 +2782,10 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
   object-fit:contain;border-radius:10px;border:1px solid var(--line);background:var(--sunk)}
 .msg.chat.self .msg-img{margin-left:auto}
 .img-broken{display:inline-block;font-size:12px;color:var(--fg-4);border:1px dashed var(--line-2);border-radius:6px;padding:2px 7px;margin:3px 0}
+.linkbox{display:inline}
+.linkbox.ok>.msg-link{display:none}
+.msg-link{color:var(--fg-2);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
+.msg.chat.self .msg-link{color:var(--panel);opacity:.85}
 .blank-state{padding:40px 24px;text-align:center;color:var(--fg-3);font-size:13px}
 .oops{margin:24px auto;max-width:720px;border:1px solid var(--line-2);border-left:3px solid #b4242a;
   border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.7;background:var(--panel)}
@@ -2786,21 +2851,30 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
     }
     return out + esc(x.slice(i));
   }
-  var MEDIA_RE = /!\[[^\]]*\]\(\s*([^)\s]+)\s*\)|<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["'][^>]*>|(data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+)|(https?:\/\/[^\s<>"']+?\.(?:png|jpe?g|gif|webp|bmp|svg|apng)(?:\?[^\s<>"']*)?)/gi;
+  var MEDIA_RE = /!\[[^\]]*\]\(\s*([^)\s]+)\s*\)|<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["'][^>]*>|(data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+)|(https?:\/\/[^\s<>"'\u3000\uff0c\u3002\uff01\uff1f]+)/gi;
+  var EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|apng|avif)(\?|#|$)/i;
   function safeSrc(u) {
-    u = String(u || '').trim().replace(/&amp;/g, '&');
+    u = String(u || '').trim().replace(/&amp;/g, '&').replace(/[\u3002\uff0c\uff09)\]\u3011.,;]+$/, '');
     return /^(https?:\/\/|data:image\/)/i.test(u) ? u : '';
   }
+  function imgTag(src, probe) {
+    return '<img class="msg-img' + (probe ? ' probe' : '') + '" src="' + esc(src) +
+           '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">';
+  }
   function rich(x) {
+    if (x.indexOf('http') === -1 && x.indexOf('![') === -1 && x.indexOf('<img') === -1 && x.indexOf('data:image') === -1) return hl(x);
     MEDIA_RE.lastIndex = 0;
     if (!MEDIA_RE.test(x)) return hl(x);
     MEDIA_RE.lastIndex = 0;
     var out = '', last = 0, mm;
     while ((mm = MEDIA_RE.exec(x)) !== null) {
+      var explicit = !!(mm[1] || mm[2] || mm[3]);
       var src = safeSrc(mm[1] || mm[2] || mm[3] || mm[4]);
       if (!src) continue;
       out += hl(x.slice(last, mm.index));
-      out += '<img class="msg-img" src="' + esc(src) + '" alt="" loading="lazy" decoding="async">';
+      if (explicit || EXT_RE.test(src)) out += imgTag(src, false);
+      else out += '<span class="linkbox"><a class="msg-link" href="' + esc(src) +
+                  '" target="_blank" rel="noopener noreferrer">' + esc(src) + '</a>' + imgTag(src, true) + '</span>';
       last = mm.index + mm[0].length;
     }
     return out + hl(x.slice(last));
@@ -2890,12 +2964,19 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
     el.style.minHeight = el.offsetHeight + 'px';
     el.innerHTML = ''; el.dataset.on = '0';
   }
+  list.addEventListener('load', function (e) {
+    var el = e.target;
+    if (!el || !el.classList || !el.classList.contains('msg-img')) return;
+    var box = el.closest ? el.closest('.linkbox') : null;
+    if (box) box.className = 'linkbox ok';
+  }, true);
   list.addEventListener('error', function (e) {
-    if (e.target && e.target.className === 'msg-img') {
-      var s2 = document.createElement('span');
-      s2.className = 'img-broken'; s2.textContent = '[图片打不开]';
-      e.target.replaceWith(s2);
-    }
+    var el = e.target;
+    if (!el || !el.classList || !el.classList.contains('msg-img')) return;
+    if (el.classList.contains('probe')) { el.parentNode && el.parentNode.removeChild(el); return; }
+    var s2 = document.createElement('span');
+    s2.className = 'img-broken'; s2.textContent = '[图片打不开]';
+    el.replaceWith(s2);
   }, true);
 
   var tmr = 0;
