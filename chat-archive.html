@@ -17,6 +17,7 @@
   --shadow-2:0 4px 14px rgba(16,19,26,.07);
   --shadow-3:0 18px 48px rgba(16,19,26,.13);
   --r:10px; --r-sm:7px;
+  --img-max:150px;                 /* 图片 / 表情包的最大边长，可在自定义 CSS 里改 */
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   --script:"Cormorant Garamond",Didot,"Bodoni MT","Playfair Display",Georgia,"Times New Roman",serif;
@@ -236,12 +237,12 @@ button, input, select, textarea { font-family:inherit; }
 .msg:hover .msg-idx { opacity:1; }
 .msg-text { font-size:14.5px; line-height:1.66; color:var(--fg); white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; }
 .msg-img {
-  display:block; margin:5px 0 2px; max-width:min(260px,100%); max-height:260px;
-  min-width:26px; min-height:26px; width:auto; height:auto; object-fit:contain; border-radius:10px;
+  display:block; margin:4px 0 2px; max-width:min(var(--img-max),100%); max-height:var(--img-max);
+  min-width:24px; min-height:24px; width:auto; height:auto; object-fit:contain; border-radius:9px;
   border:1px solid var(--line); background:var(--sunk);
 }
 .msg.chat.self .msg-img { margin-left:auto; }
-.img-broken { display:inline-block; font-size:12px; color:var(--fg-4); border:1px dashed var(--line-2); border-radius:6px; padding:2px 7px; margin:3px 0; }
+.msg-link.broken { display:inline-block; font-size:11.5px; color:var(--fg-4); word-break:break-all; }
 .linkbox { display:inline; }
 .linkbox.ok > .msg-link { display:none; }
 .msg-link { color:var(--fg-2); text-decoration:underline; text-underline-offset:2px; word-break:break-all; }
@@ -274,6 +275,11 @@ mark { background:var(--mark-bg); color:var(--mark-fg); border-radius:2px; paddi
 .msg.chat.self .msg-tags { justify-content:flex-end; }
 .msg.chat .msg-tags { padding:0 3px; }
 .msg.chat.hit .bubble { border-color:var(--fg-3); box-shadow:0 0 0 3px var(--sunk); }
+/* 纯表情包 / 纯图片的消息：不套气泡，就是一张图 */
+.msg.media-only .bubble { background:none; border:0; box-shadow:none; padding:0; }
+.msg.media-only .msg-img { border:0; background:none; margin:2px 0; border-radius:10px; }
+.msg.chat.media-only.hit .bubble { box-shadow:none; }
+.msg.media-only .msg-trans { border-top:0; padding-top:0; margin-top:4px; }
 .msg.chat .msg-open { right:2px; }
 /* 连续同一个人：省掉重复的名字和头像 */
 .msg.chat.cont { padding-top:1px; }
@@ -559,6 +565,7 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
   <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9Z"/><circle cx="8" cy="8" r="1.3"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
   <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4.5 4.5L19 7"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
 </defs></svg>
@@ -571,7 +578,7 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
       <div class="brand"><b>Chat</b><span class="script">Archive</span></div>
       <div class="flex-1"></div>
       <button class="btn" id="btnImport"><svg class="i"><use href="#i-upload"/></svg>导入</button>
-      <button class="iconbtn" id="btnSettings" title="设置"><svg class="i i-lg"><use href="#i-code"/></svg></button>
+      <button class="iconbtn" id="btnSettings" title="外观：头像形状 / 样式"><svg class="i i-lg"><use href="#i-sliders"/></svg></button>
       <button class="iconbtn" id="btnTheme" title="深色 / 浅色"><svg class="i i-lg"><use href="#i-theme"/></svg></button>
     </header>
 
@@ -711,7 +718,7 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
   <div class="menu-sep"></div>
   <button class="menu-item" data-act="export"><svg class="i"><use href="#i-download"/></svg>导出 / 转成 HTML…</button>
   <button class="menu-item" data-act="rename"><svg class="i"><use href="#i-edit"/></svg>重命名会话</button>
-  <button class="menu-item" data-act="css"><svg class="i"><use href="#i-code"/></svg>自定义 CSS</button>
+  <button class="menu-item" data-act="css"><svg class="i"><use href="#i-sliders"/></svg>外观（头像形状 / 样式）</button>
   <div class="menu-sep"></div>
   <button class="menu-item danger" data-act="delete"><svg class="i"><use href="#i-trash"/></svg>删除这个会话</button>
 </div>
@@ -887,7 +894,7 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
     <button class="iconbtn" data-close><svg class="i"><use href="#i-close"/></svg></button></div>
   <div class="modal-body">
     <div class="field">
-      <label class="label">头像形状</label>
+      <label class="label">头像形状（方形 / 圆形）</label>
       <div class="seg" id="avatarSeg" style="display:inline-flex">
         <button data-av="round">圆形</button>
         <button data-av="square">方形</button>
@@ -987,6 +994,12 @@ function mediaUrl(p) {
   return '';
 }
 
+/* 这一段是不是「图片/表情包」而不是文字 —— 是的话就用地址，不要它的描述词 */
+function isMediaPart(p) {
+  var t = String((p && (p.type || p.kind || p.msgtype || p.contentType)) || '').toLowerCase();
+  return /image|sticker|photo|img|emoji|gif|media|attachment|file|picture/.test(t);
+}
+
 function toText(v) {
   if (v == null) return '';
   var t = typeof v;
@@ -1000,15 +1013,17 @@ function toText(v) {
       if (typeof p === 'string') { buf.push(p); continue; }
       if (typeof p !== 'object') { buf.push(String(p)); continue; }
       var txt = p.text != null ? p.text : (p.content != null ? p.content : (p.value != null ? p.value : p.caption));
+      var u = mediaUrl(p);
+      // 图片段先取地址：否则 {type:'sticker', caption:'微笑', url:…} 只会剩下「微笑」两个字
+      if (u && (isMediaPart(p) || txt == null)) { buf.push('![](' + u + ')'); continue; }
       if (txt != null && typeof txt !== 'object') { buf.push(String(txt)); continue; }
-      var u = mediaUrl(p);                       // 图片/表情包：留成 markdown，渲染时再还原成 <img>
       if (u) { buf.push('![](' + u + ')'); continue; }
       if (txt != null) buf.push(toText(txt));
     }
     return buf.join('');
   }
   var mu = mediaUrl(v);
-  if (mu && v.text == null && v.content == null) return '![](' + mu + ')';
+  if (mu && (isMediaPart(v) || (v.text == null && v.content == null))) return '![](' + mu + ')';
   if (v.text != null) return toText(v.text);
   if (v.content != null) return toText(v.content);
   if (v.value != null) return toText(v.value);
@@ -1018,13 +1033,19 @@ function toText(v) {
 /* 图片地址可能压根不在消息字段里，而在同级的 image / pic / attachments…
    所以整条记录扫一遍，把像图片的地址补进正文（去重），渲染层再还原成 <img>。*/
 var IMG_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg|apng|avif)(\?|#|$)/i;
-var IMG_KEY_RE = /(image|img|pic|photo|sticker|emoji|thumb|cover|media|attach|file|url|src)/i;
-function looksImage(key, val) {
+var IMG_KEY_RE = /(image|img|pic|photo|sticker|emoji|thumb|cover|avatar)/i;   // 一看就是图片的键名
+var VAGUE_KEY_RE = /(url|src|uri|link|file|media|attach)/i;                   // 含糊的键名，要看上下文
+function looksImage(key, val, owner) {
   if (typeof val !== 'string' || val.length > 4000) return false;
   if (/^data:image\//i.test(val)) return true;
   if (!/^https?:\/\//i.test(val)) return false;
   if (IMG_EXT_RE.test(val)) return true;
-  return IMG_KEY_RE.test(key || '');
+  if (IMG_KEY_RE.test(key || '')) return true;
+  // url / src 这种键名太泛，只有当这一段本身是图片段、或者压根没有正文时才算
+  if (!VAGUE_KEY_RE.test(key || '')) return false;
+  if (!owner) return false;
+  if (isMediaPart(owner)) return true;
+  return owner.text == null && owner.content == null && owner.caption == null;
 }
 function collectImages(obj, out, depth) {
   if (!obj || typeof obj !== 'object' || depth > 3 || out.length > 8) return;
@@ -1032,10 +1053,10 @@ function collectImages(obj, out, depth) {
   for (var i = 0; i < keys.length && out.length <= 8; i++) {
     var k = keys[i], v = obj[k];
     if (typeof v === 'string') {
-      if (looksImage(k, v) && out.indexOf(v) === -1) out.push(v);
+      if (looksImage(k, v, obj) && out.indexOf(v) === -1) out.push(v);
     } else if (Array.isArray(v)) {
       for (var j = 0; j < v.length && out.length <= 8; j++) {
-        if (typeof v[j] === 'string') { if (looksImage(k, v[j]) && out.indexOf(v[j]) === -1) out.push(v[j]); }
+        if (typeof v[j] === 'string') { if (looksImage(k, v[j], obj) && out.indexOf(v[j]) === -1) out.push(v[j]); }
         else collectImages(v[j], out, depth + 1);
       }
     } else if (v && typeof v === 'object') collectImages(v, out, depth + 1);
@@ -1361,6 +1382,11 @@ function imgTag(src, probe) {
 /* 明确写成图片的（markdown / <img> / data URI / 带图片扩展名）直接当图片；
    其余普通链接先当链接显示，同时偷偷试着加载一次 —— 能加载出来就换成图片，
    加载不出来就还是链接。图床地址大多没有扩展名，靠猜是猜不准的。 */
+function isMediaOnly(text) {
+  if (!mayHaveMedia(text)) return false;
+  MEDIA_RE.lastIndex = 0;
+  return text.replace(MEDIA_RE, '').trim() === '';
+}
 function mayHaveMedia(t) {
   return t.indexOf('http') !== -1 || t.indexOf('![') !== -1 || t.indexOf('<img') !== -1 || t.indexOf('data:image') !== -1;
 }
@@ -1786,6 +1812,7 @@ function renderRow(vi) {
   el.innerHTML =
     (needsDaySep(vi) ? '<div class="daysep"><span>' + esc(fmtDay(S.times[gi])) + '</span></div>' : '') +
     '<div class="msg ' + (chat ? 'chat' : 'flat') + (isSelf ? ' self' : '') + (cont ? ' cont' : '') +
+      (isMediaOnly(text) ? ' media-only' : '') +
       (transShown(gi) ? ' trans-open' : '') + (subOf(gi) && S.transMode !== 'off' ? ' has-trans' : '') +
       (hit || flash ? ' hit' : '') + '">' +
       (S.selMode ? '<span class="msg-check"><svg class="i"><use href="#i-check"/></svg></span>' : '') +
@@ -1808,7 +1835,13 @@ spacer.addEventListener('error', e => {
   const el = e.target;
   if (!el || !el.classList || !el.classList.contains('msg-img')) return;
   if (el.classList.contains('probe')) el.remove();   // 只是试一下，不是图片就安静退回链接
-  else el.replaceWith(Object.assign(document.createElement('span'), { className: 'img-broken', textContent: '[图片打不开]' }));
+  else {                                            // 打不开就把地址露出来，方便复制排查
+    const a = document.createElement('a');
+    a.className = 'msg-link broken';
+    a.href = el.src; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = el.src;
+    el.replaceWith(a);
+  }
   vlist.schedule();
 }, true);
 
@@ -3117,6 +3150,8 @@ const CLASS_DOC = [
   ['.daysep', '日期分隔条'],
   ['.msg-tags / .tag / .tag.more', '字段标签行 / 标签 / 「+N 个字段」'],
   ['.avatar / .avatar img', '头像 / 上传的头像图'],
+  ['.msg-img', '消息里的图片 / 表情包（大小用 --img-max 调）'],
+  ['.msg.media-only', '只有图片没有文字的消息（不套气泡）'],
   ['.avstack', '列表和标题栏上叠在一起的头像'],
   ['mark', '搜索关键词高亮'],
   ['.row', '虚拟列表行容器（别改 position 和 transform）'],
@@ -3211,7 +3246,7 @@ $('#cssReset').addEventListener('click', () => { $('#cssInput').value = ''; appl
 :root{--bg:#f6f7f9;--panel:#fff;--panel-2:#f0f2f6;--sunk:#e9ecf1;--fg:#10131a;--fg-2:#565e6c;--fg-3:#8b93a2;--fg-4:#b3bac6;
 --line:#e1e5ec;--line-2:#cbd1db;--ink:#10131a;--paper:#fbfcfd;--mark-bg:#10131a;--mark-fg:#fff;
 --script:"Cormorant Garamond",Didot,"Bodoni MT",Georgia,serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
---shadow-1:0 1px 2px rgba(16,19,26,.05)}
+--img-max:150px;--shadow-1:0 1px 2px rgba(16,19,26,.05)}
 @media (prefers-color-scheme:dark){:root{--bg:#0a0c10;--panel:#101319;--panel-2:#161a21;--sunk:#0d1015;--fg:#e8ebf0;--fg-2:#969fae;
 --fg-3:#69717f;--fg-4:#4a515d;--line:#1f242c;--line-2:#2b323c;--ink:#e8ebf0;--paper:#13171d;--mark-bg:#e8ebf0;--mark-fg:#0a0c10;
 --shadow-1:0 1px 2px rgba(0,0,0,.4)}}
@@ -3255,10 +3290,14 @@ select:focus,input:focus{border-color:var(--fg-2)}
 .tag k{color:var(--fg-4);font-family:var(--mono);font-size:10px;letter-spacing:.03em}
 .tag v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px}
 mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 1px}
-.msg-img{display:block;margin:5px 0 2px;max-width:min(260px,100%);max-height:260px;min-width:26px;min-height:26px;width:auto;height:auto;
-  object-fit:contain;border-radius:10px;border:1px solid var(--line);background:var(--sunk)}
+.msg-img{display:block;margin:4px 0 2px;max-width:min(var(--img-max),100%);max-height:var(--img-max);
+  min-width:24px;min-height:24px;width:auto;height:auto;object-fit:contain;border-radius:9px;
+  border:1px solid var(--line);background:var(--sunk)}
+.msg.media-only .bubble{background:none;border:0;box-shadow:none;padding:0}
+.msg.media-only .msg-img{border:0;background:none;margin:2px 0;border-radius:10px}
+.msg.media-only .msg-trans{border-top:0;padding-top:0;margin-top:4px}
 .msg.chat.self .msg-img{margin-left:auto}
-.img-broken{display:inline-block;font-size:12px;color:var(--fg-4);border:1px dashed var(--line-2);border-radius:6px;padding:2px 7px;margin:3px 0}
+.msg-link.broken{display:inline-block;font-size:11.5px;color:var(--fg-4);word-break:break-all}
 :root[data-avatar="square"] .avatar{border-radius:9px}
 .msg-trans{margin-top:7px;padding-top:6px;border-top:1px solid var(--line);font-size:13px;line-height:1.62;
   color:var(--fg-3);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
@@ -3366,6 +3405,11 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
     }
     return out + hl(x.slice(last));
   }
+  function mediaOnly(x) {
+    if (x.indexOf('http') === -1 && x.indexOf('![') === -1 && x.indexOf('<img') === -1 && x.indexOf('data:image') === -1) return false;
+    MEDIA_RE.lastIndex = 0;
+    return x.replace(MEDIA_RE, '').trim() === '';
+  }
   function fnum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function avatar(nm) {
     if (av[nm]) return '<span class="avatar"><img src="' + esc(av[nm]) + '" alt=""></span>';
@@ -3436,7 +3480,8 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
           esc(vv.length > 60 ? vv.slice(0, 60) + '…' : vv) + '</v></span>';
       }
       h += '<div class="msg' + (chat ? ' chat' : ' flat') + (chat && nm === D.self ? ' self' : '') +
-        (subs && subs[g] && transMode !== 'off' ? ' has-trans' : '') + '">' +
+        (subs && subs[g] && transMode !== 'off' ? ' has-trans' : '') +
+        (mediaOnly(m[g]) ? ' media-only' : '') + '">' +
         avatar(nm) + '<div class="msg-body"><div class="msg-head">' +
         '<span class="msg-name">' + esc(nm) + '</span>' +
         (t && t[g] ? '<span class="msg-time">' + fmt(t[g]) + '</span>' : '') +
@@ -3486,9 +3531,11 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
     var el = e.target;
     if (!el || !el.classList || !el.classList.contains('msg-img')) return;
     if (el.classList.contains('probe')) { el.parentNode && el.parentNode.removeChild(el); return; }
-    var s2 = document.createElement('span');
-    s2.className = 'img-broken'; s2.textContent = '[图片打不开]';
-    el.replaceWith(s2);
+    var a2 = document.createElement('a');
+    a2.className = 'msg-link broken';
+    a2.href = el.src; a2.target = '_blank'; a2.rel = 'noopener noreferrer';
+    a2.textContent = el.src;
+    el.replaceWith(a2);
   }, true);
 
   var tmr = 0;
