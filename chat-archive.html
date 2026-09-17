@@ -175,6 +175,7 @@ button, input, select, textarea { font-family: inherit; }
 .dropzone p { font-size:12.5px; color:var(--fg-3); text-align:center; line-height:1.75; }
 .dropzone code { font-family:var(--mono); font-size:11.5px; background:var(--sunk); padding:1px 5px; border-radius:4px; color:var(--fg-2); }
 .intro-foot { font-size:12px; color:var(--fg-4); text-align:center; }
+.intro-actions { display:flex; gap:9px; margin-top:5px; flex-wrap:wrap; justify-content:center; }
 
 /* ============================================================
    档案室（角色 = 档案袋）
@@ -546,6 +547,10 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
   .top-actions .seg button { flex:1; justify-content:center; height:30px; font-size:12.5px; }
   .lbl { display:inline; font-size:13.5px; }
 
+  #intro { padding:20px 14px; gap:18px; }
+  .intro-mark .script { font-size:34px; }
+  .dropzone { padding:26px 16px 22px; }
+  .intro-actions .btn { flex:1 1 auto; min-width:132px; justify-content:center; }
   .roster-head { padding:16px 16px 12px; }
   .roster-title .script { font-size:27px; }
   .roster-body { padding:16px 14px 40px; }
@@ -597,6 +602,8 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
   <symbol id="i-sort" viewBox="0 0 24 24"><path d="M4 7h16M7 12h10M10 17h4"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="M14.5 7.5 16.5 9.5"/></symbol>
+  <symbol id="i-html" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/><path d="m9.5 13-1.6 1.6 1.6 1.6M14 13l1.6 1.6-1.6 1.6"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2L8 5h8l1.5 2h2A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-9Z"/><circle cx="12" cy="12.5" r="3.2"/></symbol>
   <symbol id="i-code" viewBox="0 0 24 24"><path d="m9 8-5 4 5 4M15 8l5 4-5 4"/></symbol>
   <symbol id="i-bubble" viewBox="0 0 24 24"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10Z"/></symbol>
@@ -629,6 +636,7 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
       </div>
       <button class="iconbtn need-data" id="btnRoster" title="档案室"><svg class="i i-lg"><use href="#i-folder"/></svg><span class="lbl">档案室</span></button>
       <button class="iconbtn" id="btnImport" title="导入"><svg class="i i-lg"><use href="#i-upload"/></svg><span class="lbl">导入</span></button>
+      <button class="iconbtn" id="btnConvert2" title="JSON 转 HTML"><svg class="i i-lg"><use href="#i-html"/></svg><span class="lbl">JSON 转 HTML</span></button>
       <button class="iconbtn need-data" id="btnExport" title="导出"><svg class="i i-lg"><use href="#i-download"/></svg><span class="lbl">导出</span></button>
       <button class="iconbtn" id="btnCSS" title="自定义 CSS"><svg class="i i-lg"><use href="#i-code"/></svg><span class="lbl">自定义 CSS</span></button>
       <button class="iconbtn" id="btnTheme" title="切换主题"><svg class="i i-lg"><use href="#i-theme"/></svg><span class="lbl">深色 / 浅色</span></button>
@@ -646,10 +654,12 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
       <svg class="i i-xl" style="color:var(--fg-3)"><use href="#i-upload"/></svg>
       <h2>建立档案</h2>
       <p>拖入 <code>.json</code> / <code>.jsonl</code> / <code>.ndjson</code>，或点击选择文件。<br>解析在后台线程完成，百万条也不会卡住页面。</p>
-      <div style="display:flex;gap:9px;margin-top:5px">
+      <div class="intro-actions">
         <button class="btn" id="btnPick"><svg class="i"><use href="#i-file"/></svg>选择文件</button>
-        <button class="btn ghost" id="btnPaste">粘贴 JSON</button>
+        <button class="btn ghost" id="btnConvert"><svg class="i"><use href="#i-html"/></svg>直接转成 HTML</button>
+        <button class="btn quiet" id="btnPaste">粘贴 JSON</button>
       </div>
+      <div class="intro-foot" style="margin-top:2px">「直接转成 HTML」= 选个 JSON 备份，自动识别字段，立刻下载一个能直接打开的聊天页面</div>
     </div>
     <div class="intro-foot">全部数据只留在本机浏览器里 · 不上传 · 不联网</div>
   </section>
@@ -820,6 +830,23 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
     <div class="note"><svg class="i"><use href="#i-info"/></svg>
       <span>导出的 HTML 自带分块懒加载和搜索，几十万条也能直接用浏览器打开。</span></div>
   </div>
+</div></div>
+
+<!-- 改名 -->
+<div class="overlay" id="renameModal"><div class="modal" style="width:min(440px,100%)">
+  <div class="modal-head"><svg class="i i-lg"><use href="#i-edit"/></svg>
+    <span class="modal-title">改名</span><span class="flex-1"></span>
+    <button class="iconbtn" data-close><svg class="i"><use href="#i-close"/></svg></button></div>
+  <div class="modal-body">
+    <div class="field">
+      <label class="label">显示名 <span id="renameOld" style="color:var(--fg-4)"></span></label>
+      <input type="text" id="renameInput" autocomplete="off" spellcheck="false">
+      <div class="help" id="renameHint">只改显示用的名字，原始 JSON 不动。改成已有角色的名字就会把两个合并成一个。</div>
+    </div>
+  </div>
+  <div class="modal-foot"><span class="flex-1"></span>
+    <button class="btn ghost" data-close>取消</button>
+    <button class="btn" id="renameGo">保存</button></div>
 </div></div>
 
 <!-- 自定义 CSS -->
@@ -1187,11 +1214,11 @@ const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll
 
 const S = {
   texts: [], times: new Float64Array(0), senderIdx: new Int32Array(0), senders: [],
-  fieldPaths: [], rawJson: null, mapping: {}, fieldMode: 'all', avgFields: 0,
+  fieldPaths: [], rawJson: null, mapping: {}, fieldMode: 'off', avgFields: 0,
   view: new Int32Array(0), sender: -1, query: '', mode: 'filter',
   hits: null, navHits: null, hitPos: -1,
   expanded: new Set(), heights: new Map(), avgCharW: 12,
-  layout: 'flat', selfName: '', avatars: new Map(),
+  layout: 'flat', selfName: '', avatars: new Map(), cached: false, convertAfterLoad: false,
   fileName: '', parsed: null, detailGi: -1, route: 'empty'
 };
 
@@ -1625,6 +1652,7 @@ function folderCard(si) {
     '<div class="folder-preview">' + esc(preview.slice(0, 110) || '（无文本）') + '</div>' +
     (all ? '' :
       '<div class="folder-tools">' +
+        '<button class="btn ghost" data-act="rename">改名</button>' +
         '<button class="btn ghost" data-act="avatar">换头像</button>' +
         '<button class="btn ghost" data-act="self">' + (isSelf ? '取消我方' : '设为我方') + '</button>' +
       '</div>');
@@ -1657,13 +1685,80 @@ $('#folders').addEventListener('click', e => {
   if (act && si >= 0) {
     e.stopPropagation();
     const nm = S.senders[si].name;
-    if (act.dataset.act === 'avatar') pickAvatar(nm);
+    const a = act.dataset.act;
+    if (a === 'avatar') pickAvatar(nm);
+    else if (a === 'rename') openRename(si);
     else { S.selfName = S.selfName === nm ? '' : nm; persistPrefs(); renderRoster(); renderRoles(); vlist.redrawAll(); }
     return;
   }
   selectSender(si);
   goRoute('reader');
 });
+
+/* ---------------- 改名（支持合并同名角色） ---------------- */
+let renameIdx = -1;
+function openRename(si) {
+  if (si < 0 || !S.senders[si]) return;
+  renameIdx = si;
+  $('#renameOld').textContent = '原：' + S.senders[si].name;
+  $('#renameInput').value = S.senders[si].name;
+  $('#renameHint').textContent = '只改显示用的名字，原始 JSON 不动。改成已有角色的名字就会把两个合并成一个。';
+  openModal('#renameModal');
+  setTimeout(() => { $('#renameInput').focus(); $('#renameInput').select(); }, 60);
+}
+function doRename() {
+  const si = renameIdx;
+  if (si < 0 || !S.senders[si]) return;
+  const name = $('#renameInput').value.trim();
+  if (!name) { $('#renameHint').textContent = '名字不能为空'; return; }
+  const old = S.senders[si].name;
+  if (name === old) { closeModal('#renameModal'); return; }
+  const merged = renameSender(si, name);
+  closeModal('#renameModal');
+  toast(merged ? '已把「' + old + '」并入「' + name + '」' : '「' + old + '」已改名为「' + name + '」');
+}
+$('#renameGo').addEventListener('click', doRename);
+$('#renameInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doRename(); } });
+
+function renameSender(si, name) {
+  const old = S.senders[si].name;
+  const target = S.senders.findIndex((s, i) => i !== si && s.name === name);
+  let merged = false;
+
+  if (target >= 0) {
+    merged = true;
+    const a = S.senders[target], b = S.senders[si];
+    a.count += b.count;
+    if (isFinite(b.first) && (!isFinite(a.first) || b.first < a.first)) a.first = b.first;
+    if (isFinite(b.last) && (!isFinite(a.last) || b.last > a.last)) a.last = b.last;
+    if (!a.preview) a.preview = b.preview;
+    // 旧下标 -> 新下标（先算好，再 splice）
+    const map = new Int32Array(S.senders.length);
+    for (let k = 0; k < S.senders.length; k++) {
+      let v = (k === si) ? target : k;
+      if (v > si) v--;
+      map[k] = v;
+    }
+    const idx = S.senderIdx;
+    for (let i = 0; i < idx.length; i++) idx[i] = map[idx[i]];
+    S.senders.splice(si, 1);
+    if (S.sender >= 0) S.sender = map[S.sender];
+  } else {
+    S.senders[si].name = name;
+  }
+
+  if (S.avatars.has(old)) {                       // 头像跟着名字走
+    const img = S.avatars.get(old);
+    if (!S.avatars.has(name)) { S.avatars.set(name, img); saveAvatar(name, img); }
+    S.avatars.delete(old);
+    deleteAvatar(old);
+  }
+  if (S.selfName === old) { S.selfName = name; persistPrefs(); }
+
+  renderRoster(); renderRoles(); rebuildView();
+  if (S.cached) saveCache();
+  return merged;
+}
 
 /* ---------------- 头像上传 ---------------- */
 let pendingAvatar = '';
@@ -1788,7 +1883,22 @@ let searchT0 = 0, lastReq = 0, lastSearchMs = 0;
 function onWorkerMessage(e) {
   const d = e.data;
   if (d.type === 'progress') showLoading($('#loadTitle').textContent, d.note, Math.round(d.pct));
-  else if (d.type === 'parsed') { hideLoading(); S.parsed = d; buildMapUI(d); openModal('#mapModal'); }
+  else if (d.type === 'parsed') {
+    hideLoading(); S.parsed = d; buildMapUI(d);
+    if (S.convertAfterLoad && d.detected && d.detected.message) {
+      // 一键转换：字段识别没问题就不打扰，直接建档再导出
+      S.mapping = {
+        message: d.detected.message,
+        sender: d.detected.sender || '',
+        timestamp: d.detected.timestamp || ''
+      };
+      showLoading('转换中', '归一化', 0);
+      wpost({ type: 'normalize', mapping: S.mapping, keepRaw: $('#optRaw').checked, sortByTime: false });
+    } else {
+      if (S.convertAfterLoad) $('#mapMsg').textContent = '确认后会直接导出 HTML';
+      openModal('#mapModal');
+    }
+  }
   else if (d.type === 'normalized') applyNormalized(d);
   else if (d.type === 'reindexed') hideLoading();
   else if (d.type === 'result') {
@@ -1829,7 +1939,11 @@ function rebuildView() {
 function updateBars() {
   const total = S.texts.length;
   const title = S.sender < 0 ? '全部消息' : S.senders[S.sender].name;
-  $('#viewTitle').innerHTML = (S.sender < 0 ? '' : avatarHTML(title, 'sm')) + '<span>' + esc(title) + '</span>';
+  $('#viewTitle').innerHTML = (S.sender < 0 ? '' : avatarHTML(title, 'sm')) + '<span>' + esc(title) + '</span>' +
+    (S.sender < 0 ? '' : '<button class="iconbtn" id="btnRenameHere" title="改名" style="width:24px;height:24px">' +
+      '<svg class="i" style="width:14px;height:14px"><use href="#i-edit"/></svg></button>');
+  const rb = $('#btnRenameHere');
+  if (rb) rb.addEventListener('click', () => openRename(S.sender));
   const parts = [];
   if (total) {
     parts.push(num(S.view.length) + ' 条');
@@ -2007,6 +2121,12 @@ function readFile(file) {
 }
 $('#fileInput').addEventListener('change', e => { readFile(e.target.files[0]); e.target.value = ''; });
 $('#btnPick').addEventListener('click', () => $('#fileInput').click());
+function startConvert() {
+  S.convertAfterLoad = true;
+  $('#fileInput').click();
+}
+$('#btnConvert').addEventListener('click', e => { e.stopPropagation(); startConvert(); });
+$('#btnConvert2').addEventListener('click', startConvert);
 $('#dropzone').addEventListener('click', e => { if (!e.target.closest('button')) $('#fileInput').click(); });
 $('#btnImport').addEventListener('click', () => $('#fileInput').click());
 $('#btnPaste').addEventListener('click', e => { e.stopPropagation(); openModal('#pasteModal'); });
@@ -2128,14 +2248,22 @@ function applyNormalized(d) {
   if (S.selfName && !S.senders.some(s => s.name === S.selfName)) S.selfName = '';
   computeAvgCharW();
   computeAvgFields();
-  if (S.avgFields > 10 && S.fieldMode === 'all') S.fieldMode = 'lite';
   syncFieldSeg();
   renderRoles(); renderRoster(); rebuildView();
   goRoute('roster');
   hideLoading();
-  toast('档案已建立 · ' + num(S.texts.length) + ' 条 · ' + num(S.senders.length) + ' 位角色' +
-        (S.avgFields ? ' · 每条 ' + S.avgFields + ' 个附加字段' : ''));
   if ($('#optCache').checked) saveCache(); else updateCacheInfo(null);
+
+  if (S.convertAfterLoad) {
+    S.convertAfterLoad = false;
+    setTimeout(() => {
+      exportHTMLNow({ quick: true });
+      toast('已导出 HTML · ' + num(S.texts.length) + ' 条 · 档案也留在这儿了');
+    }, 60);
+    return;
+  }
+  toast('档案已建立 · ' + num(S.texts.length) + ' 条 · ' + num(S.senders.length) + ' 位角色' +
+        (S.avgFields ? '（另存了 ' + S.avgFields + ' 个字段，顶部可切换显示）' : ''));
 }
 
 /* ---------------- IndexedDB ---------------- */
@@ -2162,6 +2290,9 @@ function reqP(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.
 async function saveAvatar(name, data) {
   try { const db = await idbOpen(); await runTx(db, 'readwrite', st => st.put(data, 'av:' + name)); }
   catch (e) { toast('头像没能保存到本地'); }
+}
+async function deleteAvatar(name) {
+  try { const db = await idbOpen(); await runTx(db, 'readwrite', st => st.delete('av:' + name)); } catch (e) {}
 }
 async function loadAvatars() {
   try {
@@ -2199,8 +2330,10 @@ async function saveCache() {
       hasRaw: keepRaw, fileName: S.fileName, savedAt: Date.now(),
       avgCharW: S.avgCharW, avgFields: S.avgFields
     };
+    // 清理必须单独一个事务：游标的 delete 是在 onsuccess 里才排队的，
+    // 和 put 放同一个事务会排到 put 后面，把刚写进去的数据又删掉。
+    await runTx(db, 'readwrite', clearDataKeys);
     await runTx(db, 'readwrite', st => {
-      clearDataKeys(st);
       st.put(meta, 'meta');
       st.put({ times: S.times, senderIdx: S.senderIdx }, 'cols');
       for (let c = 0; c < chunks; c++) {
@@ -2239,6 +2372,7 @@ async function loadCache() {
 }
 
 function updateCacheInfo(meta) {
+  S.cached = !!meta;
   $('#cacheInfo').textContent = meta ? num(meta.count) + ' 条 · ' + fmtDay(meta.savedAt) : '未缓存';
 }
 $('#btnClearCache').addEventListener('click', async () => {
@@ -2304,6 +2438,7 @@ function updateScopeHint() {
 }
 $('#btnExport').addEventListener('click', () => {
   if (!S.texts.length) { toast('还没有数据'); return; }
+  $('#expFields').checked = S.fieldMode !== 'off';
   updateScopeHint(); openModal('#exportModal');
 });
 function exportIndices() { return expScope === 'view' ? S.view : identityView(S.texts.length); }
@@ -2370,11 +2505,15 @@ $('#expJSON').addEventListener('click', () => {
   download(JSON.stringify(arr, null, 1), 'chat-' + stamp() + '.json', 'application/json');
 });
 
-$('#expHTML').addEventListener('click', () => {
-  const v = exportIndices();
+function exportHTMLNow(opt) {
+  const q = opt || {};
+  const v = q.quick ? identityView(S.texts.length) : exportIndices();
   if (!bigConfirm(v.length)) return;
-  const showTime = $('#expTime').checked, showIdx = $('#expIndex').checked;
-  const withAv = $('#expAvatar').checked, withCSS = $('#expCSS').checked;
+  const showTime = q.quick ? true : $('#expTime').checked;
+  const showIdx = q.quick ? false : $('#expIndex').checked;
+  const withAv = q.quick ? true : $('#expAvatar').checked;
+  const withCSS = q.quick ? true : $('#expCSS').checked;
+  const withFields = q.quick ? (S.fieldMode !== 'off') : $('#expFields').checked;
 
   const used = [], remap = new Map();
   const s = new Array(v.length), m = new Array(v.length);
@@ -2391,7 +2530,7 @@ $('#expHTML').addEventListener('click', () => {
 
   // 全字段：从保留的原始记录里取，最多 40 个字段
   let tagKeys = [], tags = [];
-  if ($('#expFields').checked && S.rawJson) {
+  if (withFields && S.rawJson) {
     if (v.length > 120000) toast('条数太多，导出时省略了字段标签');
     else {
       const short = new Map();
@@ -2411,7 +2550,7 @@ $('#expHTML').addEventListener('click', () => {
   const av = {};
   if (withAv) used.forEach(n => { if (S.avatars.has(n)) av[n] = S.avatars.get(n); });
 
-  const title = S.sender < 0 ? '聊天记录' : S.senders[S.sender].name;
+  const title = (q.quick || S.sender < 0) ? (S.fileName ? S.fileName.replace(/\.[^.]+$/, '') : '聊天记录') : S.senders[S.sender].name;
   const payload = {
     title, names: used, s, m, t, idx, av,
     tagKeys, tags,
@@ -2437,14 +2576,15 @@ $('#expHTML').addEventListener('click', () => {
     '<script id="D" type="application/json">' + json + '<\/script>\n' +
     '<script>' + js + '<\/script>\n</body>\n</html>';
   download(html, 'chat-' + stamp() + '.html', 'text/html');
-});
+}
+$('#expHTML').addEventListener('click', () => exportHTMLNow());
 
 /* ---------------- 启动 ---------------- */
 (async function init() {
   try {
     S.layout = localStorage.getItem('ca-layout') || 'flat';
     S.selfName = localStorage.getItem('ca-self') || '';
-    S.fieldMode = localStorage.getItem('ca-fields') || 'all';
+    S.fieldMode = localStorage.getItem('ca-fields') || 'off';
   } catch (e) {}
   $$('#layoutSeg button').forEach(b => b.classList.toggle('on', b.dataset.layout === S.layout));
 
@@ -2468,7 +2608,6 @@ $('#expHTML').addEventListener('click', () => {
     S.avgCharW = c.meta.avgCharW || 12;
     S.avgFields = c.meta.avgFields || 0;
     if (!S.avgFields && S.rawJson) computeAvgFields();
-    if (S.avgFields > 10 && S.fieldMode === 'all') S.fieldMode = 'lite';
     syncFieldSeg();
     if (S.selfName && !S.senders.some(x => x.name === S.selfName)) S.selfName = '';
     renderRoles(); renderRoster(); rebuildView();
