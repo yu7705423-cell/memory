@@ -1876,6 +1876,9 @@ function enterSel(gi) {
   vlist.remeasureAll();
 }
 function exitSel(quiet) {
+  // 注意：只认 true。直接当事件处理器用时这里会收到 Event 对象，
+  // 若按真值判断就会跳过重绘，退出选择模式后小圈圈会残留在屏幕上。
+  const silent = quiet === true;
   if (!S.selMode) return;
   S.selMode = false;
   S.sel.clear();
@@ -1884,7 +1887,7 @@ function exitSel(quiet) {
   $('#selHead').hidden = true;
   $('#selBar').hidden = true;
   S.heights.clear();
-  if (!quiet) vlist.remeasureAll();     // 数据正在被替换时不能在这里重排，视图还指着旧下标
+  if (!silent) vlist.remeasureAll();    // 数据正在被替换时不能在这里重排，视图还指着旧下标
 }
 function toggleSel(gi) {
   if (S.sel.has(gi)) S.sel.delete(gi); else { S.sel.add(gi); S.lastSel = gi; }
@@ -1915,7 +1918,7 @@ function syncSel() {
 }
 function selList() { return Array.from(S.sel).sort((a, b) => a - b); }
 
-$('#selCancel').addEventListener('click', exitSel);
+$('#selCancel').addEventListener('click', () => exitSel());
 $('#selAll').addEventListener('click', () => {
   if (S.sel.size >= S.view.length) S.sel.clear();
   else for (let i = 0; i < S.view.length; i++) S.sel.add(S.view[i]);
