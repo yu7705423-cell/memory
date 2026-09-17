@@ -285,22 +285,16 @@ mark { background:var(--mark-bg); color:var(--mark-fg); border-radius:2px; paddi
 .msg.flat:hover { background:var(--panel-2); }
 .msg.flat.hit { background:var(--panel-2); box-shadow:inset 2px 0 0 var(--fg); }
 
-.msg-trans-toggle {
-  display:inline-flex; align-items:center; gap:5px; margin-top:5px; padding:2px 8px 2px 6px;
-  border:1px solid var(--line); background:var(--panel); color:var(--fg-3);
-  border-radius:99px; font-size:11px; cursor:pointer; line-height:1.6;
-}
-.msg-trans-toggle:hover { color:var(--fg); border-color:var(--line-2); }
-.msg-trans-toggle .i { width:11px; height:11px; transition:transform .16s; }
-.msg.trans-open .msg-trans-toggle .i { transform:rotate(90deg); }
+/* 翻译：没有按钮，点消息本身出现；只是一行更淡的字，上面一条细线 */
 .msg-trans {
-  margin-top:6px; padding:7px 11px; font-size:13.5px; line-height:1.66;
-  color:var(--fg-2); background:var(--sunk); border-left:2px solid var(--line-2);
-  border-radius:3px 9px 9px 3px; white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere;
+  margin-top:7px; padding-top:6px; border-top:1px solid var(--line);
+  font-size:13px; line-height:1.62; color:var(--fg-3);
+  white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere;
 }
-.msg.chat .msg-trans { max-width:100%; }
-.msg.chat.self .msg-trans { background:var(--panel-2); color:var(--fg-2); border-left-color:var(--fg-3); }
-.msg.chat.self .msg-trans-toggle { margin-left:auto; }
+.msg.chat.self .msg-trans { border-top-color:rgba(255,255,255,.22); color:rgba(255,255,255,.66); }
+:root[data-theme="dark"] .msg.chat.self .msg-trans { border-top-color:rgba(0,0,0,.2); color:rgba(10,12,16,.6); }
+.msg.flat .msg-trans { border-top:0; padding-top:2px; margin-top:4px; }
+.has-trans .bubble, .msg.flat.has-trans .msg-body { cursor:pointer; }
 /* 多选：只在左边加一个小对勾，气泡本身不做任何选中态 */
 .msg-check {
   position:absolute; left:14px; top:50%; transform:translateY(-50%);
@@ -702,10 +696,10 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
     <button data-layout="chat"><svg class="i"><use href="#i-bubble"/></svg>气泡</button>
     <button data-layout="flat"><svg class="i"><use href="#i-rows"/></svg>平铺</button>
   </div>
-  <div class="menu-label" id="transLabel">翻译 / 副文本</div>
+  <div class="menu-label" id="transLabel">翻译 / 副文本（点消息即可展开）</div>
   <div class="seg" id="transSeg">
-    <button data-tm="fold">折叠</button>
-    <button data-tm="open">展开</button>
+    <button data-tm="fold">点开才看</button>
+    <button data-tm="open">一直显示</button>
     <button data-tm="off">不显示</button>
   </div>
   <div class="menu-label">每条下方的字段</div>
@@ -1707,9 +1701,8 @@ function estimate(vi) {
   let h = lines * 23.5 + (clamp ? 22 : 0);
   h += S.mode === 'results' ? 42 : (S.layout === 'chat' ? (isCont(vi) ? 21 : 39) : 36);
   if (needsDaySep(vi)) h += 40;
-  if (S.subs && S.subs[gi] && S.transMode !== 'off' && S.mode === 'normal') {
-    h += 24;                                             // 翻译按钮
-    if (transShown(gi)) h += 16 + Math.max(1, Math.ceil(S.subs[gi].length / cpl)) * 22.4;
+  if (S.subs && S.subs[gi] && S.transMode !== 'off' && S.mode === 'normal' && transShown(gi)) {
+    h += 14 + Math.max(1, Math.ceil(S.subs[gi].length / cpl)) * 21.1;
   }
   if (S.rawJson && S.fieldMode !== 'off' && S.avgFields && S.mode === 'normal') {
     const shown = S.fieldMode === 'lite' ? Math.min(liteN(), S.avgFields) : S.avgFields;
@@ -1725,11 +1718,8 @@ function transShown(gi) {
 }
 function transHTML(gi) {
   const sub = subOf(gi);
-  if (!sub || S.transMode === 'off' || S.mode === 'results') return '';
-  const open = transShown(gi);
-  return '<button class="msg-trans-toggle"><svg class="i"><use href="#i-chev"/></svg>' +
-         (open ? '收起翻译' : '翻译') + '</button>' +
-         (open ? '<div class="msg-trans">' + richText(sub, S.query) + '</div>' : '');
+  if (!sub || S.transMode === 'off' || S.mode === 'results' || !transShown(gi)) return '';
+  return '<div class="msg-trans">' + richText(sub, S.query) + '</div>';
 }
 
 function tagsHTML(gi) {
@@ -1789,14 +1779,15 @@ function renderRow(vi) {
     (chat ? '<div class="bubble">' : '') +
       '<div class="msg-text' + (clamp ? ' clamped' : '') + '">' + richText(text, S.query) + '</div>' +
       (clamp ? '<button class="msg-more">展开全文（' + num(text.length) + ' 字）</button>' : '') +
+      transHTML(gi) +
     (chat ? '</div>' : '') +
-    transHTML(gi) +
     tagsHTML(gi);
 
   el.innerHTML =
     (needsDaySep(vi) ? '<div class="daysep"><span>' + esc(fmtDay(S.times[gi])) + '</span></div>' : '') +
     '<div class="msg ' + (chat ? 'chat' : 'flat') + (isSelf ? ' self' : '') + (cont ? ' cont' : '') +
-      (transShown(gi) ? ' trans-open' : '') + (hit || flash ? ' hit' : '') + '">' +
+      (transShown(gi) ? ' trans-open' : '') + (subOf(gi) && S.transMode !== 'off' ? ' has-trans' : '') +
+      (hit || flash ? ' hit' : '') + '">' +
       (S.selMode ? '<span class="msg-check"><svg class="i"><use href="#i-check"/></svg></span>' : '') +
       avatarHTML(name, 'sm') +
       '<div class="msg-body">' + body + '</div>' +
@@ -1832,13 +1823,17 @@ spacer.addEventListener('click', e => {
     return;
   }
   if (e.target.closest('.msg-more')) { S.expanded.add(gi); S.heights.delete(gi); vlist.invalidate(vi); return; }
-  if (e.target.closest('.msg-trans-toggle')) {
+  if (e.target.closest('.msg-open') || e.target.closest('.tag.more')) { openDetail(gi); return; }
+  // 点消息本身 = 开/关翻译（选中文字、点链接图片按钮时不算）
+  if (subOf(gi) && S.transMode !== 'off' && S.mode === 'normal' &&
+      !e.target.closest('a') && !e.target.closest('img') && !e.target.closest('button')) {
+    const selTxt = window.getSelection ? String(window.getSelection()) : '';
+    if (selTxt.length > 1) return;
     if (S.transOpen.has(gi)) S.transOpen.delete(gi); else S.transOpen.add(gi);
     S.heights.delete(gi);
     vlist.invalidate(vi);
     return;
   }
-  if (e.target.closest('.msg-open') || e.target.closest('.tag.more')) { openDetail(gi); return; }
   if (S.mode === 'results') jumpTo(gi);
 });
 
@@ -3111,9 +3106,9 @@ const CLASS_DOC = [
   ['.bubble', '气泡本身（平铺模式没有）'],
   ['.msg-name / .msg-time / .msg-idx', '名字 / 时间 / 原始序号'],
   ['.msg-text', '消息正文'],
-  ['.msg-trans', '展开后的翻译 / 副文本'],
-  ['.msg-trans-toggle', '「翻译」那颗展开按钮'],
-  ['.msg.trans-open', '翻译已展开的消息'],
+  ['.msg-trans', '翻译 / 副文本那几行字'],
+  ['.msg.trans-open', '翻译正展开着的消息'],
+  ['.msg.has-trans', '有翻译可点的消息'],
   ['.msg-check / .row.sel', '多选的小对勾 / 被选中的那行'],
   ['.msg-text.clamped', '被折叠的超长正文'],
   ['.daysep', '日期分隔条'],
@@ -3262,14 +3257,12 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
 .msg.chat.self .msg-img{margin-left:auto}
 .img-broken{display:inline-block;font-size:12px;color:var(--fg-4);border:1px dashed var(--line-2);border-radius:6px;padding:2px 7px;margin:3px 0}
 :root[data-avatar="square"] .avatar{border-radius:9px}
-.msg-trans-toggle{display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:2px 8px 2px 6px;
-  border:1px solid var(--line);background:var(--panel);color:var(--fg-3);border-radius:99px;font-size:11px;cursor:pointer;line-height:1.6}
-.msg-trans-toggle:hover{color:var(--fg);border-color:var(--line-2)}
-.msg-trans{margin-top:6px;padding:7px 11px;font-size:13.5px;line-height:1.66;color:var(--fg-2);
-  background:var(--sunk);border-left:2px solid var(--line-2);border-radius:3px 9px 9px 3px;
-  white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
-.msg.chat.self .msg-trans{background:var(--panel-2);border-left-color:var(--fg-3)}
-.msg.chat.self .msg-trans-toggle{margin-left:auto}
+.msg-trans{margin-top:7px;padding-top:6px;border-top:1px solid var(--line);font-size:13px;line-height:1.62;
+  color:var(--fg-3);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.msg.chat.self .msg-trans{border-top-color:rgba(255,255,255,.22);color:rgba(255,255,255,.66)}
+@media (prefers-color-scheme:dark){.msg.chat.self .msg-trans{border-top-color:rgba(0,0,0,.2);color:rgba(10,12,16,.6)}}
+.msg.flat .msg-trans{border-top:0;padding-top:2px;margin-top:4px}
+.has-trans .bubble,.msg.flat.has-trans .msg-body{cursor:pointer}
 .linkbox{display:inline}
 .linkbox.ok>.msg-link{display:none}
 .msg-link{color:var(--fg-2);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
@@ -3439,13 +3432,14 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
         if (vv) tg += '<span class="tag"><k>' + esc(tagKeys[p]) + '</k><v>' +
           esc(vv.length > 60 ? vv.slice(0, 60) + '…' : vv) + '</v></span>';
       }
-      h += '<div class="msg' + (chat ? ' chat' : ' flat') + (chat && nm === D.self ? ' self' : '') + '">' +
+      h += '<div class="msg' + (chat ? ' chat' : ' flat') + (chat && nm === D.self ? ' self' : '') +
+        (subs && subs[g] && transMode !== 'off' ? ' has-trans' : '') + '">' +
         avatar(nm) + '<div class="msg-body"><div class="msg-head">' +
         '<span class="msg-name">' + esc(nm) + '</span>' +
         (t && t[g] ? '<span class="msg-time">' + fmt(t[g]) + '</span>' : '') +
         (idx ? '<span class="msg-idx">#' + idx[g] + '</span>' : '') + '</div>' +
-        (chat ? '<div class="bubble">' : '') + '<div class="msg-text">' + rich(m[g]) + '</div>' + (chat ? '</div>' : '') +
-        transBlock(g) +
+        (chat ? '<div class="bubble">' : '') + '<div class="msg-text">' + rich(m[g]) + '</div>' +
+        transBlock(g) + (chat ? '</div>' : '') +
         (tg ? '<div class="msg-tags">' + tg + '</div>' : '') +
         '</div></div>';
     }
@@ -3456,18 +3450,22 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
     return transMode === 'open' ? !opened[g] : !!opened[g];
   }
   function transBlock(g) {
-    if (!subs || !subs[g] || transMode === 'off') return '';
-    var on = transOpen(g);
-    return '<button class="msg-trans-toggle" data-g="' + g + '">' + (on ? '收起翻译' : '翻译') + '</button>' +
-           (on ? '<div class="msg-trans">' + rich(subs[g]) + '</div>' : '');
+    if (!subs || !subs[g] || transMode === 'off' || !transOpen(g)) return '';
+    return '<div class="msg-trans">' + rich(subs[g]) + '</div>';
   }
-  list.addEventListener('click', function (e) {
-    var b = e.target.closest && e.target.closest('.msg-trans-toggle');
-    if (!b) return;
-    var g = b.dataset.g;
+  list.addEventListener('click', function (e) {          // 点消息本身开/关翻译
+    if (!subs || transMode === 'off') return;
+    if (!e.target.closest) return;
+    if (e.target.closest('a') || e.target.closest('img') || e.target.closest('button')) return;
+    var msg = e.target.closest('.msg.has-trans');
+    if (!msg) return;
+    if (window.getSelection && String(window.getSelection()).length > 1) return;
+    var blk = msg.closest('.blk');
+    if (!blk) return;
+    var a = +blk.dataset.a, idxIn = Array.prototype.indexOf.call(blk.children, msg);
+    var g = view[a + idxIn];
     if (opened[g]) delete opened[g]; else opened[g] = 1;
-    var blk = b.closest('.blk');
-    if (blk) { blk.dataset.on = '0'; fill(blk); }
+    blk.dataset.on = '0'; fill(blk);
   });
 
   function unfill(el) {
