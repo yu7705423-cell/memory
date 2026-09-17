@@ -210,6 +210,9 @@ button, input, select, textarea { font-family:inherit; }
 .chat-search { position:absolute; inset:0; display:flex; align-items:center; gap:8px; padding:0 12px; background:var(--panel); z-index:5; }
 .chat-search .searchbox { flex:1; }
 
+/* 浮动的日期胶囊和「继续」胶囊要相对消息区定位；
+   直接挂在 #chat 上会跑到标题栏底下去，看不见也点不到 */
+.chat-body { position:relative; flex:1; min-height:0; display:flex; flex-direction:column; }
 .viewport { flex:1; overflow-y:auto; overflow-x:hidden; position:relative; contain:strict; background:var(--bg); }
 .spacer { position:relative; width:100%; }
 .row { position:absolute; top:0; left:0; right:0; will-change:transform; }
@@ -228,6 +231,13 @@ button, input, select, textarea { font-family:inherit; }
 .msg-idx { font-size:10.5px; color:var(--fg-4); font-family:var(--mono); margin-left:auto; opacity:0; }
 .msg:hover .msg-idx { opacity:1; }
 .msg-text { font-size:14.5px; line-height:1.66; color:var(--fg); white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; }
+.msg-img {
+  display:block; margin:5px 0 2px; max-width:min(260px,100%); max-height:260px;
+  min-width:26px; min-height:26px; width:auto; height:auto; object-fit:contain; border-radius:10px;
+  border:1px solid var(--line); background:var(--sunk);
+}
+.msg.chat.self .msg-img { margin-left:auto; }
+.img-broken { display:inline-block; font-size:12px; color:var(--fg-4); border:1px dashed var(--line-2); border-radius:6px; padding:2px 7px; margin:3px 0; }
 .msg-text.clamped { max-height:8.4em; overflow:hidden;
   -webkit-mask-image:linear-gradient(180deg,#000 66%,transparent); mask-image:linear-gradient(180deg,#000 66%,transparent); }
 .msg-more { margin-top:4px; font-size:11.5px; color:var(--fg-2); background:none; border:0; padding:0;
@@ -290,6 +300,14 @@ mark { background:var(--mark-bg); color:var(--mark-fg); border-radius:2px; paddi
   z-index:4; font-variant-numeric:tabular-nums; opacity:0; transition:opacity .2s; box-shadow:var(--shadow-1);
 }
 .datechip.show { opacity:1; }
+.resume-chip {
+  position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:6;
+  background:var(--ink); color:var(--panel); font-size:12.5px; padding:7px 9px 7px 14px;
+  border:0; border-radius:99px; cursor:pointer; box-shadow:var(--shadow-2);
+  display:flex; align-items:center; gap:8px; font-variant-numeric:tabular-nums;
+}
+.resume-chip .x { display:flex; opacity:.6; padding:2px; border-radius:50%; }
+.resume-chip .x:hover { opacity:1; background:rgba(255,255,255,.18); }
 .blank-state {
   position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
   justify-content:center; gap:10px; text-align:center; padding:40px; color:var(--fg-3); z-index:3;
@@ -568,15 +586,18 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
       </div>
     </header>
 
-    <div class="viewport" id="viewport">
-      <div class="spacer" id="spacer"></div>
-      <div class="blank-state" id="noHit" hidden>
-        <svg class="i i-xl"><use href="#i-search"/></svg>
-        <h2>没有匹配的消息</h2>
-        <p id="noHitSub"></p>
+    <div class="chat-body">
+      <div class="viewport" id="viewport">
+        <div class="spacer" id="spacer"></div>
+        <div class="blank-state" id="noHit" hidden>
+          <svg class="i i-xl"><use href="#i-search"/></svg>
+          <h2>没有匹配的消息</h2>
+          <p id="noHitSub"></p>
+        </div>
       </div>
+      <div class="datechip" id="dateChip"></div>
+      <button class="resume-chip" id="resumeChip" hidden></button>
     </div>
-    <div class="datechip" id="dateChip"></div>
 
     <div class="scrim" id="scrim"></div>
 
@@ -759,6 +780,20 @@ textarea { min-height:130px; font-family:var(--mono); font-size:12px; resize:ver
     <button class="btn" id="renameGo">保存</button></div>
 </div></div>
 
+<!-- 退出时：要不要记住看到哪儿 -->
+<div class="overlay" id="resumeModal"><div class="modal" style="width:min(400px,100%)">
+  <div class="modal-head"><svg class="i i-lg"><use href="#i-bubble"/></svg>
+    <span class="modal-title">记住看到哪儿了吗</span></div>
+  <div class="modal-body">
+    <div class="help" id="resumeWhere" style="margin:0 0 12px;font-size:13px;color:var(--fg)"></div>
+    <label class="check"><input type="checkbox" id="resumeRemember">
+      <span>以后都这样，不用再问<span class="check-sub">之后可以在设置里改回来</span></span></label>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" id="resumeNo">不用</button>
+    <button class="btn" id="resumeYes">记住</button></div>
+</div></div>
+
 <!-- 设置 / 自定义 CSS -->
 <div class="overlay" id="cssModal"><div class="modal wide">
   <div class="modal-head"><svg class="i i-lg"><use href="#i-code"/></svg>
@@ -829,6 +864,26 @@ function getPath(obj, path) {
   return cur;
 }
 
+/* 从一个内容片段里找图片地址：兼容 image_url / image / source(base64) / url / src 等写法 */
+function mediaUrl(p) {
+  if (!p || typeof p !== 'object') return '';
+  var cand = p.image_url || p.imageUrl || p.image || p.sticker || p.photo || p.file || p.media;
+  if (typeof cand === 'string') return cand;
+  if (cand && typeof cand === 'object') {
+    var u = cand.url || cand.src || cand.uri || cand.path;
+    if (typeof u === 'string') return u;
+  }
+  // Anthropic 风格：{type:'image', source:{type:'base64', media_type, data}}
+  var s = p.source;
+  if (s && typeof s === 'object') {
+    if (typeof s.url === 'string') return s.url;
+    if (s.data && s.media_type) return 'data:' + s.media_type + ';base64,' + s.data;
+  }
+  var d = p.url || p.src || p.uri;
+  if (typeof d === 'string') return d;
+  return '';
+}
+
 function toText(v) {
   if (v == null) return '';
   var t = typeof v;
@@ -839,12 +894,18 @@ function toText(v) {
     for (var i = 0; i < v.length; i++) {
       var p = v[i];
       if (p == null) continue;
-      if (typeof p === 'string') buf.push(p);
-      else if (typeof p === 'object') buf.push(p.text || p.content || p.value || p.caption || '');
-      else buf.push(String(p));
+      if (typeof p === 'string') { buf.push(p); continue; }
+      if (typeof p !== 'object') { buf.push(String(p)); continue; }
+      var txt = p.text != null ? p.text : (p.content != null ? p.content : (p.value != null ? p.value : p.caption));
+      if (txt != null && typeof txt !== 'object') { buf.push(String(txt)); continue; }
+      var u = mediaUrl(p);                       // 图片/表情包：留成 markdown，渲染时再还原成 <img>
+      if (u) { buf.push('![](' + u + ')'); continue; }
+      if (txt != null) buf.push(toText(txt));
     }
     return buf.join('');
   }
+  var mu = mediaUrl(v);
+  if (mu && v.text == null && v.content == null) return '![](' + mu + ')';
   if (v.text != null) return toText(v.text);
   if (v.content != null) return toText(v.content);
   if (v.value != null) return toText(v.value);
@@ -1124,7 +1185,7 @@ const S = {
   avgCharW: 12, avgFields: 0, selfName: '', layout: 'chat', fieldMode: 'off',
   view: new Int32Array(0), query: '', hits: null, mode: 'normal', flashGi: -1,
   expanded: new Set(), heights: new Map(), avatars: new Map(),
-  parsed: null, pendingFile: ''
+  parsed: null, pendingFile: '', enterGi: 0, pendingRead: -1
 };
 
 /* ---------------- 工具 ---------------- */
@@ -1140,6 +1201,28 @@ function hl(text, q) {
   }
   return out + esc(text.slice(i));
 }
+/* 消息里可能夹着图片：markdown 图片、<img src>、data URI、以及看起来像图片的直链。
+   一律先转义，再只把认得出的、协议安全的地址还原成 <img>，绝不注入任意 HTML。 */
+const MEDIA_RE = /!\[[^\]]*\]\(\s*([^)\s]+)\s*\)|<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["'][^>]*>|(data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+)|(https?:\/\/[^\s<>"']+?\.(?:png|jpe?g|gif|webp|bmp|svg|apng)(?:\?[^\s<>"']*)?)/gi;
+function safeSrc(u) {
+  u = String(u || '').trim().replace(/&amp;/g, '&');
+  return /^(https?:\/\/|data:image\/)/i.test(u) ? u : '';
+}
+function richText(text, q) {
+  MEDIA_RE.lastIndex = 0;
+  if (!MEDIA_RE.test(text)) return hl(text, q);
+  MEDIA_RE.lastIndex = 0;
+  let out = '', last = 0, m;
+  while ((m = MEDIA_RE.exec(text)) !== null) {
+    const src = safeSrc(m[1] || m[2] || m[3] || m[4]);
+    if (!src) continue;
+    out += hl(text.slice(last, m.index), q);
+    out += '<img class="msg-img" src="' + esc(src) + '" alt="" loading="lazy" decoding="async">';
+    last = m.index + m[0].length;
+  }
+  return out + hl(text.slice(last), q);
+}
+
 const nf = new Intl.NumberFormat('zh-CN');
 const num = n => nf.format(n);
 const dtFull = new Intl.DateTimeFormat('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false });
@@ -1488,7 +1571,7 @@ function renderRow(vi) {
         '<div class="msg-body"><div class="msg-head">' +
           '<span class="msg-name">' + esc(name) + '</span>' +
           '<span class="msg-time">' + fmtFull(S.times[gi]) + '</span></div>' +
-        '<div class="msg-text">' + hl(snip, S.query) + '</div>' +
+        '<div class="msg-text">' + richText(snip, S.query) + '</div>' +
         '<div class="result-go">跳到这条的上下文<svg class="i" style="width:12px;height:12px"><use href="#i-chev"/></svg></div>' +
         '</div></div>';
     return el;
@@ -1509,7 +1592,7 @@ function renderRow(vi) {
     '</div>';
   const body = (cont ? head : head) +
     (chat ? '<div class="bubble">' : '') +
-      '<div class="msg-text' + (clamp ? ' clamped' : '') + '">' + hl(text, S.query) + '</div>' +
+      '<div class="msg-text' + (clamp ? ' clamped' : '') + '">' + richText(text, S.query) + '</div>' +
       (clamp ? '<button class="msg-more">展开全文（' + num(text.length) + ' 字）</button>' : '') +
     (chat ? '</div>' : '') +
     tagsHTML(gi);
@@ -1526,6 +1609,15 @@ function renderRow(vi) {
 }
 
 const vlist = new VList(viewport, spacer, renderRow);
+spacer.addEventListener('load', e => {            // 图片加载完高度才定下来
+  if (e.target && e.target.classList && e.target.classList.contains('msg-img')) vlist.schedule();
+}, true);
+spacer.addEventListener('error', e => {
+  if (e.target && e.target.classList && e.target.classList.contains('msg-img')) {
+    e.target.replaceWith(Object.assign(document.createElement('span'), { className: 'img-broken', textContent: '[图片打不开]' }));
+    vlist.schedule();
+  }
+}, true);
 
 spacer.addEventListener('click', e => {
   const row = e.target.closest('.row');
@@ -1689,7 +1781,67 @@ function goChat() {
   closeDrawers(); closeMenus();
   vlist.applySpace(); vlist.draw();
 }
-$('#btnBack').addEventListener('click', goList);
+$('#btnBack').addEventListener('click', leaveChat);
+
+/* ---------------- 看到哪儿了 ---------------- */
+function resumePref() {
+  try { return localStorage.getItem('ca-resume') || 'ask'; } catch (e) { return 'ask'; }
+}
+function setResumePref(v) { try { localStorage.setItem('ca-resume', v); } catch (e) {} }
+
+function currentTopGi() {
+  const vi = vlist.firstVisible();
+  return vi >= 0 && S.mode === 'normal' ? S.view[vi] : -1;
+}
+async function saveReadPos(gi) {
+  await touchMeta({ readGi: gi, readAt: Date.now() });
+  renderList();
+}
+function leaveChat() {
+  const gi = currentTopGi();
+  const moved = gi > 0 && Math.abs(gi - S.enterGi) > 20;
+  const pref = resumePref();
+  if (!moved || pref === 'never') { goList(); return; }
+  if (pref === 'always') { saveReadPos(gi); goList(); return; }
+  S.pendingRead = gi;
+  $('#resumeWhere').textContent = '这次看到第 ' + num(gi + 1) + ' 条（共 ' + num(S.texts.length) + ' 条）。下次打开可以直接跳回来。';
+  $('#resumeRemember').checked = false;
+  openModal('#resumeModal');
+}
+$('#resumeYes').addEventListener('click', () => {
+  if ($('#resumeRemember').checked) setResumePref('always');
+  saveReadPos(S.pendingRead);
+  closeModal('#resumeModal');
+  goList();
+  toast('记住了，下次打开能跳回第 ' + num(S.pendingRead + 1) + ' 条');
+});
+$('#resumeNo').addEventListener('click', () => {
+  if ($('#resumeRemember').checked) setResumePref('never');
+  closeModal('#resumeModal');
+  goList();
+});
+
+let resumeTimer = 0;
+function showResumeChip(meta) {
+  const chip = $('#resumeChip');
+  clearTimeout(resumeTimer);
+  if (!meta || !meta.readGi || meta.readGi >= S.texts.length - 1) { chip.hidden = true; return; }
+  chip.innerHTML = '<span>上次看到第 ' + num(meta.readGi + 1) + ' 条 · 继续</span>' +
+    '<span class="x"><svg class="i" style="width:13px;height:13px"><use href="#i-close"/></svg></span>';
+  chip.hidden = false;
+  resumeTimer = setTimeout(() => { chip.hidden = true; }, 9000);
+}
+$('#resumeChip').addEventListener('click', e => {
+  const chip = $('#resumeChip');
+  const meta = S.convs.find(c => c.id === S.id);
+  chip.hidden = true;
+  clearTimeout(resumeTimer);
+  if (e.target.closest('.x') || !meta || !meta.readGi) return;
+  S.mode = 'normal';
+  rebuildView();
+  vlist.scrollToIndex(meta.readGi, Math.round(viewport.clientHeight / 4));
+  S.enterGi = meta.readGi;
+});
 
 /* ---------------- 会话列表 ---------------- */
 function renderList() {
@@ -1718,7 +1870,7 @@ function renderList() {
           esc((c.lastText || '').slice(0, 90)) + '</span>' +
       '</span>' +
       '<span class="conv-tail">' +
-        '<span class="conv-count">' + num(c.count) + ' 条</span>' +
+        '<span class="conv-count">' + (c.readGi ? '读到 ' + num(c.readGi + 1) + '/' + num(c.count) : num(c.count) + ' 条') + '</span>' +
         '<span class="iconbtn conv-more" data-more="1" style="width:26px;height:26px">' +
           '<svg class="i"><use href="#i-more"/></svg></span>' +
       '</span>';
@@ -1739,7 +1891,12 @@ $('#convs').addEventListener('click', e => {
 
 /* ---------------- 打开一个会话 ---------------- */
 async function openConv(id) {
-  if (S.id === id && S.texts.length) { goChat(); return; }
+  if (S.id === id && S.texts.length) {
+    goChat();
+    S.enterGi = currentTopGi();
+    showResumeChip(S.convs.find(c => c.id === id));
+    return;
+  }
   const meta = S.convs.find(c => c.id === id);
   if (!meta) return;
   showLoading('打开', meta.title, 20);
@@ -1770,6 +1927,8 @@ async function openConv(id) {
   viewport.scrollTop = 0;
   vlist.syncVTop();
   vlist.draw();
+  S.enterGi = 0;
+  showResumeChip(meta);
   hideLoading();
   wpost({ type: 'reindex', texts: S.texts });
 }
@@ -2447,7 +2606,7 @@ $('#expHTML').addEventListener('click', () => {
     title: S.title, names: used, s, m, t, idx, av, tagKeys, tags,
     layout: S.layout, self: S.selfName, css: $('#userCSS').textContent || ''
   };
-  const json = JSON.stringify(payload).replace(/<\//g, '<\\/')
+  const json = JSON.stringify(payload).replace(/</g, '\\u003c')
     .replace(new RegExp(String.fromCharCode(0x2028), 'g'), '\\u2028')
     .replace(new RegExp(String.fromCharCode(0x2029), 'g'), '\\u2029');
   const css = document.getElementById('exportCSS').textContent;
@@ -2558,7 +2717,15 @@ select:focus,input:focus{border-color:var(--fg-2)}
 .tag k{color:var(--fg-4);font-family:var(--mono);font-size:10px;letter-spacing:.03em}
 .tag v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px}
 mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 1px}
+.msg-img{display:block;margin:5px 0 2px;max-width:min(260px,100%);max-height:260px;min-width:26px;min-height:26px;width:auto;height:auto;
+  object-fit:contain;border-radius:10px;border:1px solid var(--line);background:var(--sunk)}
+.msg.chat.self .msg-img{margin-left:auto}
+.img-broken{display:inline-block;font-size:12px;color:var(--fg-4);border:1px dashed var(--line-2);border-radius:6px;padding:2px 7px;margin:3px 0}
 .blank-state{padding:40px 24px;text-align:center;color:var(--fg-3);font-size:13px}
+.oops{margin:24px auto;max-width:720px;border:1px solid var(--line-2);border-left:3px solid #b4242a;
+  border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.7;background:var(--panel)}
+.oops b{display:block;margin-bottom:6px}
+.oops code{font-family:var(--mono);font-size:11.5px;color:var(--fg-2);word-break:break-all}
 .msg.chat{padding:7px 24px;align-items:flex-start}
 .msg.chat .msg-body{display:flex;flex-direction:column;align-items:flex-start;max-width:min(74%,620px);flex:0 1 auto}
 .msg.chat .msg-head{margin-bottom:4px;padding:0 3px}
@@ -2579,17 +2746,25 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
 
 <script type="text/export-js" id="exportJS">
 (function () {
+  var list = document.getElementById('list');
+  function oops(msg) {                       // 出错时把原因显示出来，而不是留一片空白
+    if (!list) return;
+    list.innerHTML = '<div class="oops"><b>这份记录没能显示出来</b>' +
+      '出错信息：<code>' + String(msg).replace(/[&<>]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }) + '</code></div>';
+  }
+  try {
   var D = JSON.parse(document.getElementById('D').textContent);
   var names = D.names, s = D.s, m = D.m, t = D.t, idx = D.idx, av = D.av || {};
   var tagKeys = D.tagKeys || [], tags = D.tags || [];
-  var N = m.length, BS = 200;
-  var list = document.getElementById('list'), qEl = document.getElementById('q'),
-      roleEl = document.getElementById('role'), cntEl = document.getElementById('cnt'),
-      subEl = document.getElementById('sub'), modeEl = document.getElementById('mode');
+  var N = m.length, BS = 200, EAGER = 3;
+  var qEl = document.getElementById('q'), roleEl = document.getElementById('role'),
+      cntEl = document.getElementById('cnt'), subEl = document.getElementById('sub'),
+      modeEl = document.getElementById('mode');
   var view = [], role = -1, q = '', io = null, chat = D.layout === 'chat';
 
   if (D.css) { var st = document.createElement('style'); st.textContent = D.css; document.head.appendChild(st); }
-  function setMode() { modeEl.textContent = chat ? '对话体' : '平铺'; }
+  function setMode() { modeEl.textContent = chat ? '气泡' : '平铺'; }
   setMode();
   modeEl.addEventListener('click', function () { chat = !chat; setMode(); draw(); });
 
@@ -2611,6 +2786,25 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
     }
     return out + esc(x.slice(i));
   }
+  var MEDIA_RE = /!\[[^\]]*\]\(\s*([^)\s]+)\s*\)|<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["'][^>]*>|(data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+)|(https?:\/\/[^\s<>"']+?\.(?:png|jpe?g|gif|webp|bmp|svg|apng)(?:\?[^\s<>"']*)?)/gi;
+  function safeSrc(u) {
+    u = String(u || '').trim().replace(/&amp;/g, '&');
+    return /^(https?:\/\/|data:image\/)/i.test(u) ? u : '';
+  }
+  function rich(x) {
+    MEDIA_RE.lastIndex = 0;
+    if (!MEDIA_RE.test(x)) return hl(x);
+    MEDIA_RE.lastIndex = 0;
+    var out = '', last = 0, mm;
+    while ((mm = MEDIA_RE.exec(x)) !== null) {
+      var src = safeSrc(mm[1] || mm[2] || mm[3] || mm[4]);
+      if (!src) continue;
+      out += hl(x.slice(last, mm.index));
+      out += '<img class="msg-img" src="' + esc(src) + '" alt="" loading="lazy" decoding="async">';
+      last = mm.index + mm[0].length;
+    }
+    return out + hl(x.slice(last));
+  }
   function fnum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function avatar(nm) {
     if (av[nm]) return '<span class="avatar"><img src="' + esc(av[nm]) + '" alt=""></span>';
@@ -2624,10 +2818,10 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
     roleEl.appendChild(o);
   }
   var all = document.createElement('option');
-  all.value = -1; all.textContent = '全部角色';
+  all.value = -1; all.textContent = '全部成员';
   roleEl.insertBefore(all, roleEl.firstChild);
   roleEl.value = -1;
-  subEl.textContent = fnum(N) + ' 条消息 · ' + names.length + ' 位角色';
+  subEl.textContent = fnum(N) + ' 条消息 · ' + names.length + ' 人';
 
   function rebuild() {
     view = [];
@@ -2647,19 +2841,28 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
   }
   function draw() {
     if (io) io.disconnect();
+    io = null;
     list.innerHTML = '';
     if (!view.length) { list.innerHTML = '<div class="blank-state">没有匹配的消息</div>'; return; }
-    io = new IntersectionObserver(function (es) {
-      for (var k = 0; k < es.length; k++) {
-        if (es[k].isIntersecting) fill(es[k].target); else unfill(es[k].target);
-      }
-    }, { root: null, rootMargin: '1200px 0px' });
+    var blocks = [];
     for (var i = 0; i < view.length; i += BS) {
       var d = document.createElement('div');
       d.className = 'blk'; d.dataset.a = i;
       d.style.minHeight = estimate(i, Math.min(i + BS, view.length)) + 'px';
-      list.appendChild(d); io.observe(d);
+      list.appendChild(d); blocks.push(d);
     }
+    // 先把开头几块直接画出来：不依赖 IntersectionObserver，任何浏览器打开都立刻有内容
+    for (var k = 0; k < Math.min(EAGER, blocks.length); k++) fill(blocks[k]);
+    if (typeof IntersectionObserver !== 'function') {        // 兜底：全部画出来
+      for (var k2 = 0; k2 < blocks.length; k2++) fill(blocks[k2]);
+      return;
+    }
+    io = new IntersectionObserver(function (es) {
+      for (var k3 = 0; k3 < es.length; k3++) {
+        if (es[k3].isIntersecting) fill(es[k3].target); else unfill(es[k3].target);
+      }
+    }, { root: null, rootMargin: '1200px 0px' });
+    for (var k4 = 0; k4 < blocks.length; k4++) io.observe(blocks[k4]);
   }
   function fill(el) {
     if (el.dataset.on === '1') return;
@@ -2671,12 +2874,12 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
         if (vv) tg += '<span class="tag"><k>' + esc(tagKeys[p]) + '</k><v>' +
           esc(vv.length > 60 ? vv.slice(0, 60) + '…' : vv) + '</v></span>';
       }
-      h += '<div class="msg' + (chat ? ' chat' : '') + (chat && nm === D.self ? ' self' : '') + '">' +
+      h += '<div class="msg' + (chat ? ' chat' : ' flat') + (chat && nm === D.self ? ' self' : '') + '">' +
         avatar(nm) + '<div class="msg-body"><div class="msg-head">' +
         '<span class="msg-name">' + esc(nm) + '</span>' +
         (t && t[g] ? '<span class="msg-time">' + fmt(t[g]) + '</span>' : '') +
         (idx ? '<span class="msg-idx">#' + idx[g] + '</span>' : '') + '</div>' +
-        (chat ? '<div class="bubble">' : '') + '<div class="msg-text">' + hl(m[g]) + '</div>' + (chat ? '</div>' : '') +
+        (chat ? '<div class="bubble">' : '') + '<div class="msg-text">' + rich(m[g]) + '</div>' + (chat ? '</div>' : '') +
         (tg ? '<div class="msg-tags">' + tg + '</div>' : '') +
         '</div></div>';
     }
@@ -2687,6 +2890,14 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
     el.style.minHeight = el.offsetHeight + 'px';
     el.innerHTML = ''; el.dataset.on = '0';
   }
+  list.addEventListener('error', function (e) {
+    if (e.target && e.target.className === 'msg-img') {
+      var s2 = document.createElement('span');
+      s2.className = 'img-broken'; s2.textContent = '[图片打不开]';
+      e.target.replaceWith(s2);
+    }
+  }, true);
+
   var tmr = 0;
   qEl.addEventListener('input', function () {
     clearTimeout(tmr);
@@ -2694,6 +2905,7 @@ mark{background:var(--mark-bg);color:var(--mark-fg);border-radius:2px;padding:0 
   });
   roleEl.addEventListener('change', function () { role = +roleEl.value; rebuild(); });
   rebuild();
+  } catch (err) { oops((err && err.message) || err); }
 })();
 </script>
 
